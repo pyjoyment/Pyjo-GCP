@@ -191,6 +191,14 @@ with subtest('Calls'):
     is_ok(client().call(Call('GET', '/storage/v1/b/mybucket/o/a.txt'))['name'], 'a.txt', 'no quota project')
     is_ok(seen['quota'], None, 'no header of the quota project')
 
+    quota = Static(quota_project='quota')
+    client(credentials=quota, quota_project='other').call(Call('GET', '/storage/v1/b/mybucket/o/a.txt'))
+    is_ok(seen['quota'], 'other', 'quota project of the client over the one of the credentials')
+    client(credentials=quota, quota_project=False).call(Call('GET', '/storage/v1/b/mybucket/o/a.txt'))
+    is_ok(seen['quota'], None, 'no quota project of the client')
+    client(quota_project='other').call(Call('GET', '/storage/v1/b/mybucket/o/a.txt'))
+    is_ok(seen['quota'], 'other', 'quota project of the client without one of the credentials')
+
     result = wait(storage.call_p(Call('GET', '/storage/v1/b/mybucket/o')))
     is_ok(len(result['value']['items']), 2, 'non-blocking')
     is_ok(seen['authorization'], 'Bearer ya29.static', 'token, non-blocking')

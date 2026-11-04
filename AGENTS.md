@@ -357,7 +357,13 @@ The token goes into the headers of the request when the call has built it,
 not in the event `start` of the user agent, where Pyjo-AWS signs its request:
 a signature needs the complete request, with its absolute URL, and a bearer
 token does not. `x-goog-user-project` of the quota project goes with it, as
-`apply` of the credentials of google-auth adds it.
+`apply` of the credentials of google-auth adds it, or the one of
+`quota_project` of the client, `client_options.quota_project_id` of
+google-api-core, or none of `False`. Cloud Storage bills a request with it to
+that project, as one of a bucket of requester pays, and gives its response
+`Cache-Control: no-cache, no-store` of its own then, over the one of the
+metadata of the object, which a server of the objects of its own bucket, as
+`examples/gcs.py`, does not want, so it takes `False`.
 
 The endpoint is `https://<service>.<universe domain>` of `Pyjo.GCP.Config`,
 or its emulator, which makes the client `anonymous`, as the client library

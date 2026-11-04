@@ -314,7 +314,7 @@ with subtest('Chain'):
         credentials = chain.credentials()
         is_ok(credentials.token, 'ya29.explicit', 'file of GOOGLE_APPLICATION_CREDENTIALS first')
         is_ok(credentials.project, None, 'no project of gcloud for another file')
-        is_ok(len(chain.providers), 2, 'providers of the files')
+        is_ok(len(chain.providers), 3, 'providers of the files and of the metadata server')
         result = wait(Pyjo.GCP.Credentials.Chain.new(ua=ua).credentials_p())
         is_ok(result['value'].token, 'ya29.explicit', 'credentials, non-blocking')
 
@@ -337,7 +337,7 @@ with subtest('Chain'):
     with environ():
         scopes = ['https://www.googleapis.com/auth/devstorage.read_only']
         chain = Pyjo.GCP.Credentials.Chain.new(scopes=scopes, ua=ua)
-        is_ok([provider.scopes for provider in chain.providers], [scopes, scopes], 'scopes of the providers')
+        is_ok([provider.scopes for provider in chain.providers], [scopes, scopes, scopes], 'scopes of the providers')
 
         class Fixed(Pyjo.GCP.Credentials.Provider.object):
             async def fetch(self):

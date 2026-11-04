@@ -153,6 +153,40 @@ Google, the STS of Google and the metadata server alike: `access_token` and
 `expires_in`, or `error` and `error_description`, which `parse_token` of
 `Pyjo.GCP.Credentials.Provider` reads for them all.
 
+## The Metadata Server
+
+`Pyjo.GCP.Credentials.Metadata` is `google/auth/compute_engine` of
+google-auth, with its environment variables: the request that finds the
+server goes to `GCE_METADATA_IP`, `169.254.169.254`, the others to
+`GCE_METADATA_HOST` or `GCE_METADATA_ROOT`, `metadata.google.internal`, all
+with `Metadata-Flavor: Google`, whose response to the first has it too.
+Without it, the product of `/sys/class/dmi/id/product_name` of Linux,
+`Google...`, finds the server, as a machine of Google Cloud whose server is
+slow to answer. The provider finds the server once, as `is_on_gce` of
+`_default.default` does once a process, and then gets the token, the email of
+the service account, the project and the universe domain, the last three
+once; a server without a universe domain is of `googleapis.com`.
+`NO_GCE_CHECK` is `true` in any case, where google-auth takes only the
+lower case.
+
+The provider has a user agent of its own, of `GCE_METADATA_TIMEOUT`, 3
+seconds, and no connections kept, and `GCE_METADATA_DETECT_RETRIES`, 3, is
+its attempts, for the request that finds the server and for the others of a
+status of 5xx or without a connection: read the section The Container and the
+Instance Metadata of `../Pyjo-AWS/AGENTS.md` for why the chain does not give
+it its own. A machine that is not of Google Cloud waits for the attempts once,
+which the chain reaches without other credentials only, as google-auth does;
+`NO_GCE_CHECK=true` skips it. The tests set it, as a runner of GitHub Actions
+has the IMDS of Azure on `169.254.169.254`, and `t/GCP_Credentials_Metadata.py`
+serves the server with an application of Pyjoyment.Lite in a process of its
+own, as `t/AWS_Credentials_Metadata.py` of Pyjo-AWS does, with
+`GCE_METADATA_HOST` and `GCE_METADATA_IP` of it.
+
+The email of a service account is in the path as it is, with its `@`, as
+google-auth formats it. The scopes of the chain go to the token as
+`scopes`, joined with commas, as the client libraries of Google give their
+default scopes.
+
 ## The Service Accounts
 
 `Pyjo.GCP.Credentials.ServiceAccount` is `google/oauth2/service_account.py`

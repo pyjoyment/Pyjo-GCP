@@ -448,6 +448,24 @@ a service account, of `signJwt` of an impersonated one without a key, or of
 its key, whose provider of `Pyjo.GCP.Credentials.File` the example gives the
 subject, as google-auth has `with_subject`, or the user of
 `gcloud auth application-default login` with the scope of Gmail.
+With `-bd` of sendmail, the example is an SMTP server of RFC 5321 on
+`Pyjo.IOLoop.server`, a session of each connection, whose message goes to
+the Gmail API with `call_p` in the event loop of the server, and whose reply
+waits for the one of the API. The commands that the client sends before the
+reply, as PIPELINING lets it, stay in the buffer until the message is sent,
+so that their replies come in their order. The envelope of `MAIL FROM` and
+`RCPT TO` goes to the From and the Bcc of `complete`, as `-f` and the
+recipients of the arguments do. A temporary error of the API, of `429`, a
+status of `5xx` or a connection, is `451`, which the client tries again, as
+the server keeps no queue, and the others `550` and `554`. The server has no
+AUTH and no STARTTLS, so it listens on the loopback by default, and stops of
+`SIGINT` and `SIGTERM`, with the exit code `0` that `t/examples/sendmail.py`
+checks. A socket pair of `signal.set_wakeup_fd` wakes its event loop up on a
+signal, as `Pyjo.Server.Daemon` does: Python repeats a `select` that a signal
+interrupts, so a server without connections, whose loop has no timer, would
+not see `stop` of the handler of the signal, which a check of the time of the
+stop found.
+
 `t/examples/sendmail.py` runs it against the Gmail API of its own of
 `GMAIL_EMULATOR_HOST`, which `<SERVICE>_EMULATOR_HOST` of `Pyjo.GCP.Config`
 gives any service, without credentials.

@@ -92,3 +92,19 @@ sendmail_path = "/opt/pyjo/bin/python /opt/pyjo/examples/sendmail.py --impersona
 
 The headers of the message are as they come, so a subject of PHP that is not
 ASCII is `mb_encode_mimeheader()` of it, which `mail()` needs anyway.
+
+With `-bd` of sendmail, the script is an SMTP server, for the programs that
+send with SMTP, as PHPMailer or Symfony Mailer of PHP, on `127.0.0.1:2525`
+by default, or the address and the port of `--listen`. The envelope of
+`MAIL FROM` and `RCPT TO` is the one of `-f` and of the recipients of the
+arguments, and a message that the Gmail API does not take now is `451`, which
+the client tries again:
+
+```sh
+uv run python examples/sendmail.py --impersonate-service-account mailer@myproject.iam.gserviceaccount.com \
+  --subject noreply@example.com -bd --listen 127.0.0.1:2525
+```
+
+The server has no `AUTH` and no `STARTTLS`, so anyone who connects to it
+sends as the subject: it listens on the loopback, or in a network of its own,
+as a container next to the application.

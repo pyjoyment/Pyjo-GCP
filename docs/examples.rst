@@ -30,9 +30,11 @@ A message of the standard input sent with the Gmail API, in the place of
 user of the credentials, or the subject of the domain-wide delegation of a
 service account, of a key or impersonated without one, and a call of
 :mod:`Pyjo.GCP.Call` whose request has the message itself, of the media
-upload of ``messages.send``. ::
+upload of ``messages.send``. With ``-bd``, an SMTP server of
+:mod:`Pyjo.IOLoop`, whose messages go to the Gmail API in its event loop. ::
 
     uv run python examples/sendmail.py --subject noreply@example.com -t -i < message.eml
+    uv run python examples/sendmail.py --subject noreply@example.com -bd --listen 127.0.0.1:2525
 
 .. include:: ../examples/sendmail.py
    :code: python

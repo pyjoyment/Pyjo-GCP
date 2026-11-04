@@ -382,6 +382,46 @@ Storage is one segment of the path of the JSON API, with its slashes
 percent-encoded, which the router of Pyjoyment decodes, so the route of an
 object in a test is a wildcard, `<*name>`.
 
+## The Examples
+
+`examples/` has the scripts that show what the distribution is for, a few
+calls of Google Cloud with the Application Default Credentials of any kind,
+as `examples/` of Pyjo-AWS has them, and `docs/examples.rst` includes them.
+`examples/gcs.py` is the counterpart of `examples/s3.py` of Pyjo-AWS: the
+same application, with `Pyjo.GCP.Client` and no client library of Google,
+and the options of the gcloud CLI, `--bucket`, `--impersonate-service-account`
+and `--emulator-host`.
+
+The list of a folder is `objects.list` of the JSON API, and the content of
+an object the media of the XML API, `/<bucket>/<name>`, with the slashes of
+the name as they are, not `objects.get` of the JSON API with `alt=media`:
+that one gives `Content-Disposition: attachment` of its own to an object
+without one, which a browser downloads then instead of showing it, where the
+XML API gives the headers of the metadata of the object, as S3 does. The
+error of the XML API is XML, which `Pyjo.GCP.Call` does not read, so the
+example has its status only, which is all that it needs, as `404`.
+
+The client of the example takes `quota_project=False`: Cloud Storage gives
+`Cache-Control: no-cache, no-store` of its own to a request with
+`x-goog-user-project`, which the credentials of
+`gcloud auth application-default login` have of their `quota_project_id`,
+over `Cache-Control` of the metadata of the object, so that nothing that the
+example serves would be kept by a browser or a CDN. Both were found with a
+real bucket, and are what the example is for.
+
+The content goes to the client as it comes, of `GetObject`, a subclass of
+`Pyjo.GCP.Call` in the example, whose transaction forwards the chunks of a
+response of `200` in the event `read` of its content, each one once the
+client has read the one before, as `GetObject` of `examples/s3.py` does: read
+the section The Examples of `../Pyjo-AWS/AGENTS.md` for the empty chunk,
+the client that goes away and the client for each thread.
+
+`t/examples/gcs.py` runs the example and Cloud Storage of its own in
+processes of their own, as `t/examples/s3.py` of Pyjo-AWS, with
+`--emulator-host`, as fake-gcs-server: the list of the JSON API, the media of
+the XML API with the headers of the metadata, and no credentials, which the
+emulator checks.
+
 ## Imports of the Package
 
 The modules of the distribution import the package and each other relatively,

@@ -5,6 +5,7 @@
     :maxdepth: 1
 
     installation
+    examples
 
 .. toctree::
     :maxdepth: 1

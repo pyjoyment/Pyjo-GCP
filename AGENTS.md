@@ -217,6 +217,46 @@ private key in the repository is what a scanner of secrets reports. The
 workflow Tests runs without `cryptography`, so its backend is checked with
 `uv run --with cryptography` in development.
 
+## The Impersonated Service Accounts
+
+`Pyjo.GCP.Credentials.Impersonated` is `google/auth/impersonated_credentials.py`
+of google-auth: the token of `generateAccessToken` of the IAM Service Account
+Credentials API, with the credentials of its source, a provider that it awaits
+with `steps`, so that the source keeps its token until its own expiration.
+The request is a call of `Pyjo.GCP.Client` with the credentials of the source
+given to it, which adds their token and quota project, as `apply` of
+google-auth does, and whose `Pyjo.GCP.Error` the exception of the provider
+keeps the message of. The endpoint is
+`https://iamcredentials.<universe domain>` of the universe domain of the
+source, as google-auth has it, or an `endpoint` of the provider. A test gives
+it a relative one, as `/iam`, as the client takes an empty one for none, and
+would call Google.
+
+A file of `impersonated_service_account` names the service account in
+`service_account_impersonation_url`, of which google-auth takes the service
+account only, between the last `/` and `:generateAccessToken`, and so does
+the provider: unlike `token_uri` of `authorized_user`, the endpoint of the URL
+is not used. Its source is a file of `authorized_user`, `service_account` or
+`external_account_authorized_user` in `source_credentials`, of `provider_of`
+of `Pyjo.GCP.Credentials.File`, whose service account has the scope of IAM,
+`https://www.googleapis.com/auth/iam`, as `with_scopes` of google-auth gives
+it, and another impersonated service account is not one. The scopes of the
+file come under those of the provider of the file, which always has some,
+where google-auth takes them over the default scopes of a client library.
+
+The source of a provider made in code needs a scope that calls IAM, as
+`cloud-platform`, the default one of the chain, and not the scopes of the
+target: a token of the metadata server of those cannot impersonate. The
+project of the credentials is the one of the source, which the credentials of
+google-auth do not have, so that a program with the chain as the source gets
+the project of the environment, and a file of gcloud gets `core/project` as
+its source has none.
+
+With a `subject`, of the domain-wide delegation, the token is the one of the
+grant of RFC 7523, of the JWT that `signJwt` of the API signs, posted to
+`https://oauth2.googleapis.com/token`, in the universe domain
+`googleapis.com` only, as google-auth has it.
+
 ## The Client
 
 `Pyjo.GCP.Client` is the one of Pyjo-AWS: read the section The Client of

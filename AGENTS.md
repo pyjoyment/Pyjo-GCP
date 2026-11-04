@@ -75,6 +75,47 @@ of a protocol of each kind of API, as Pyjo-AWS does.
 Pyjo-GCP does not depend on Pyjo-AWS: a module that both need, as the steps,
 is copied, until it has a distribution of its own or a place in Pyjoyment.
 
+## The Configuration
+
+`Pyjo.GCP.Config` reads what google-auth reads, and the files of gcloud that
+google-auth leaves to gcloud itself. The configuration directory is the one of
+`_cloud_sdk.get_config_path`: `CLOUDSDK_CONFIG`, `~/.config/gcloud`, or
+`%APPDATA%\gcloud` on Windows, with the drive of `SystemDrive` without
+`APPDATA`. An empty `GOOGLE_APPLICATION_CREDENTIALS` is none, as google-auth
+compares it with `""`.
+
+google-auth gets the project of gcloud by running `gcloud config get project`,
+which is slow, and missing where gcloud is not installed. `Pyjo.GCP.Config`
+reads the properties of gcloud instead, as gcloud does: the configuration of
+`CLOUDSDK_ACTIVE_CONFIG_NAME`, of the file `active_config`, or `default`, its
+file `configurations/config_<name>` in the syntax of INI, and the variable
+`CLOUDSDK_<SECTION>_<NAME>` over a property, as `CLOUDSDK_CORE_PROJECT`. The
+properties of the installation of gcloud, in its own directory, are left out.
+
+The project is not one method, as it depends on the credentials that the chain
+finds, in the order of `_default.default`: `GOOGLE_CLOUD_PROJECT` or
+`GCLOUD_PROJECT` of `project()` over all, then the one of the file of the
+credentials, as `project_id` of a service account, then `core/project` of
+gcloud only for the file of `gcloud auth application-default login`, also when
+`GOOGLE_APPLICATION_CREDENTIALS` names it, then the one of the metadata
+server only for its credentials. `GOOGLE_CLOUD_QUOTA_PROJECT` of
+`quota_project()` comes over `quota_project_id` of the file, as
+`with_quota_project_from_environment` does.
+
+The endpoint of a service is `https://<service>.<universe domain>`, or the
+emulator of `<SERVICE>_EMULATOR_HOST`, as `STORAGE_EMULATOR_HOST` of the client
+library of Cloud Storage, with `http://` before a host without a scheme, which
+the client calls without a token. `api_endpoint_overrides` of gcloud is not
+read: its URLs have the path of the version of the API, as
+`https://storage.googleapis.com/storage/v1/`, which the calls of the client
+have in their paths.
+
+## The Steps
+
+`Pyjo.GCP.Steps` is a copy of `Pyjo.AWS.Steps`, with its error
+`Steps of GCP await`; read the section The Steps of `../Pyjo-AWS/AGENTS.md`
+for its mechanism. A change of one is made in the other too.
+
 ## Imports of the Package
 
 The modules of the distribution import the package and each other relatively,
@@ -85,9 +126,12 @@ hides the namespace that `extend_path` keeps open, so it does not find
 `Pyjo.GCP.Steps`, which Python finds through `extend_path`.
 
 The package and the tests take what Pyjoyment has, as the distribution depends
-on it already: the hashes and Base64 of `Pyjo.Util`, as `sha256_sum` and
+on it already and is a dogfood of it: the files of `Pyjo.File`, as `slurp` and
+`child`, the hashes and Base64 of `Pyjo.Util`, as `sha256_sum` and
 `b64url_encode`, the JSON of `Pyjo.JSON`, and the times of RFC 3339 of
-`Pyjo.Date`, not `hashlib`, `base64` and the formats of `datetime`.
+`Pyjo.Date`, not `open`, `os.path`, `hashlib`, `base64` and the formats of
+`datetime`. What Pyjoyment lacks and the distribution needs is added to
+Pyjoyment, not written here, as a release of Pyjoyment comes first anyway.
 
 ## Security
 

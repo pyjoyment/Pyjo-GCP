@@ -45,6 +45,15 @@ The development version is installed from the Git repository:
 pip install git+https://github.com/pyjoyment/Pyjo-GCP
 ```
 
+## Examples
+
+[`examples/`](examples) has applications of Pyjoyment.Lite that call Google
+Cloud, as a bucket of Cloud Storage as a website:
+
+```sh
+uv run python examples/gcs.py --bucket mybucket daemon
+```
+
 ## Documentation
 
 The documentation of the API is on

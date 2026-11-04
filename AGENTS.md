@@ -228,9 +228,10 @@ given to it, which adds their token and quota project, as `apply` of
 google-auth does, and whose `Pyjo.GCP.Error` the exception of the provider
 keeps the message of. The endpoint is
 `https://iamcredentials.<universe domain>` of the universe domain of the
-source, as google-auth has it, or an `endpoint` of the provider. A test gives
-it a relative one, as `/iam`, as the client takes an empty one for none, and
-would call Google.
+source, as google-auth has it, or an `endpoint` of the provider, or the `url`
+of `generateAccessToken` itself, `iam_endpoint_override` of google-auth, which
+an external account gives it. A test gives a relative one, as an empty
+endpoint of the client is the server of its user agent, not none.
 
 A file of `impersonated_service_account` names the service account in
 `service_account_impersonation_url`, of which google-auth takes the service
@@ -256,6 +257,50 @@ With a `subject`, of the domain-wide delegation, the token is the one of the
 grant of RFC 7523, of the JWT that `signJwt` of the API signs, posted to
 `https://oauth2.googleapis.com/token`, in the universe domain
 `googleapis.com` only, as google-auth has it.
+
+## The External Accounts
+
+`Pyjo.GCP.Credentials.ExternalAccount` is `google/auth/external_account.py` of
+google-auth, the base class of the kinds of the source of the subject token,
+which a subclass gets in `subject_token`, a coroutine of the steps, as
+`retrieve_subject_token` of google-auth:
+`Pyjo.GCP.Credentials.IdentityPool` of `identity_pool.py`, of a file or a
+URL. `provider_of` of `Pyjo.GCP.Credentials.File` tells the kind of
+`external_account` as `_get_external_account_credentials` of `_default.py`
+does: AWS of its `subject_token_type`, an executable of `executable` of
+`credential_source`, an identity pool otherwise, whose `certificate` of
+X.509 is not supported.
+
+The exchange is the one of `sts.py` and RFC 8693: the form of `grant_type`,
+`audience`, `scope`, `requested_token_type`, `subject_token` and
+`subject_token_type`, with `options` of `userProject` of a workforce pool
+without a client, and the basic authentication of `client_id`, to
+`token_url`, `https://sts.<universe domain>/v1/token` by default. Its
+response and its error are those of OAuth 2.0, which `parse_token` reads,
+with `expires_in` as a string too.
+
+With `service_account_impersonation_url`, the token is the one of
+`Pyjo.GCP.Credentials.Impersonated`, made once, with the URL as its `url`,
+as google-auth calls the URL itself, and `token_lifetime_seconds` of
+`service_account_impersonation` as its lifetime. Its source is a provider of
+the federated token of the scope of IAM, as `with_scopes` of the impersonated
+credentials of google-auth gives it, so that it keeps the federated token
+until its expiration, not the external account itself, which would ask
+itself again.
+
+The project is the one of `get_project_id`, which `_default.py` asks for an
+external account always: Cloud Resource Manager of the number of the project
+of the audience, or of the workforce pool user project, with the token of the
+provider, once, and none of a response that is not successful. Its URL is
+`project_url`, of `googleapis.com` in any universe, as google-auth has it,
+which a test points to its own application.
+
+`Pyjo.GCP.Credentials.ExternalAccountAuthorizedUser` is
+`external_account_authorized_user.py`: the refresh token of a user of a
+workforce pool, with the basic authentication of its client, to `token_url`,
+without scopes. The token of the file, with `expiry`, is the cached one of
+the provider, as google-auth takes it as valid, and a file without the
+fields of the refresh has that one only.
 
 ## The Client
 

@@ -105,10 +105,11 @@ class Pyjo_GCP_Credentials_Impersonated(Provider.object):
         target_principal: str,
         scopes: Sequence[str] | None = None,
         delegates: Sequence[str] | None = None,
-        lifetime: int = LIFETIME,
+        lifetime: int | None = LIFETIME,
         subject: str | None = None,
         quota_project: str | None = None,
         endpoint: str | None = None,
+        url: str | None = None,
         token_uri: str = ServiceAccount.TOKEN_URI,
         **kwargs: Any,
     ) -> None:
@@ -195,6 +196,16 @@ class Pyjo_GCP_Credentials_Impersonated(Provider.object):
         universe domain of the source.
         """
 
+        self.url = url
+        """::
+
+            url = provider.url
+
+        The URL of ``generateAccessToken`` of the service account, which
+        comes over :attr:`endpoint`, as ``service_account_impersonation_url``
+        of the credentials of an external account has it, or ``None``.
+        """
+
         self.token_uri = token_uri
         """::
 
@@ -272,9 +283,12 @@ class Pyjo_GCP_Credentials_Impersonated(Provider.object):
         if self.delegates:
             body['delegates'] = self.delegates
         endpoint = self.endpoint if self.endpoint is not None else f'https://iamcredentials.{universe}'
-        client = Client.new(service='iamcredentials', endpoint=endpoint, credentials=self.source, ua=self.ua)
         account = url_escape(self.target_principal, r'^A-Za-z0-9\-._~@')
-        call = Call.new('POST', f'/v1/projects/-/serviceAccounts/{account}:{method}', body)
+        path = f'/v1/projects/-/serviceAccounts/{account}:{method}'
+        if method == 'generateAccessToken' and self.url is not None:
+            endpoint, path = _split(self.url)
+        client = Client.new(service='iamcredentials', endpoint=endpoint, credentials=self.source, ua=self.ua)
+        call = Call.new('POST', path, body)
         try:
             data = await client.steps(call, source)
         except Error.object as e:
@@ -307,6 +321,13 @@ class Pyjo_GCP_Credentials_Impersonated(Provider.object):
         return Pyjo.Exception.new(
             f'Cannot get the token of the impersonated service account {self.target_principal}: {reason}'
         )
+
+
+# The endpoint and the path of a URL, of an empty endpoint of a relative one
+def _split(url: str) -> tuple[str, str]:
+    start = url.find('://')
+    slash = url.find('/', start + 3) if start != -1 else 0
+    return (url, '/') if slash == -1 else (url[:slash], url[slash:])
 
 
 new = Pyjo_GCP_Credentials_Impersonated.new

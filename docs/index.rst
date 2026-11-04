@@ -14,6 +14,7 @@
     api/Pyjo_GCP_Client
     api/Pyjo_GCP_Config
     api/Pyjo_GCP_Credentials
+    api/Pyjo_GCP_Credentials_AWS
     api/Pyjo_GCP_Credentials_AuthorizedUser
     api/Pyjo_GCP_Credentials_Chain
     api/Pyjo_GCP_Credentials_ExternalAccount

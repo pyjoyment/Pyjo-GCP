@@ -31,8 +31,9 @@ file of credentials of Google Cloud, as the one of
   and its source of the provider of the type of ``source_credentials``, with
   the scope of IAM,
 * ``external_account``, of :mod:`Pyjo.GCP.Credentials.IdentityPool`, of a
-  file or a URL, or :mod:`Pyjo.GCP.Credentials.Pluggable`, of an
-  executable, with the scopes of the provider,
+  file or a URL, :mod:`Pyjo.GCP.Credentials.Pluggable`, of an executable,
+  or :mod:`Pyjo.GCP.Credentials.AWS`, of AWS, with the scopes of the
+  provider,
 * ``external_account_authorized_user``, of
   :mod:`Pyjo.GCP.Credentials.ExternalAccountAuthorizedUser`.
 
@@ -56,6 +57,7 @@ import Pyjo.File
 
 from .. import Config, Credentials
 from . import (
+    AWS,
     AuthorizedUser,
     ExternalAccountAuthorizedUser,
     IdentityPool,
@@ -71,9 +73,6 @@ from typing import Any, cast
 
 # The types of the source of an impersonated service account, as google-auth has them
 _SOURCES = ('authorized_user', 'service_account', 'external_account_authorized_user')
-
-# The type of the subject token of AWS, as google-auth tells the source of AWS by it
-_AWS_SUBJECT_TOKEN_TYPE = 'urn:ietf:params:aws:token-type:aws4_request'
 
 
 class Pyjo_GCP_Credentials_File(Provider.object):
@@ -221,20 +220,16 @@ class Pyjo_GCP_Credentials_File(Provider.object):
 
         A new provider of the JSON object of a file of the type
         ``external_account``, of the kind of its source, as
-        :meth:`provider_of`, or a :mod:`Pyjo.Exception` of a kind that is not
-        supported.
+        :meth:`provider_of`, or a :mod:`Pyjo.Exception` of an invalid one.
         """
         value = info.get('credential_source')
         source: Mapping[str, Any] = cast(Mapping[str, Any], value) if isinstance(value, Mapping) else {}
-        if info.get('subject_token_type') == _AWS_SUBJECT_TOKEN_TYPE:
-            kind = 'aws'
-        elif 'executable' in source:
-            return Pluggable.Pluggable.from_info(info, scopes=scopes or self.scopes, ua=self.ua, refresh=self.refresh)
-        else:
-            return IdentityPool.IdentityPool.from_info(
-                info, scopes=scopes or self.scopes, ua=self.ua, refresh=self.refresh
-            )
-        raise Pyjo.Exception.new(f'Unsupported credentials of an external account of Google Cloud {path}: {kind}')
+        options: dict[str, Any] = {'scopes': scopes or self.scopes, 'ua': self.ua, 'refresh': self.refresh}
+        if info.get('subject_token_type') == AWS.SUBJECT_TOKEN_TYPE:
+            return AWS.AWS.from_info(info, **options)
+        if 'executable' in source:
+            return Pluggable.Pluggable.from_info(info, **options)
+        return IdentityPool.IdentityPool.from_info(info, **options)
 
 
 new = Pyjo_GCP_Credentials_File.new

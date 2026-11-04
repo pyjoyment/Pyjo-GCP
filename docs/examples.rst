@@ -20,3 +20,19 @@ folders and objects. ::
 
 .. include:: ../examples/gcs.py
    :code: python
+
+
+Gmail
+-----
+
+A message of the standard input sent with the Gmail API, in the place of
+``sendmail``, with its options that PHP, cron and the others give it, as the
+user of the credentials, or the subject of the domain-wide delegation of a
+service account, of a key or impersonated without one, and a call of
+:mod:`Pyjo.GCP.Call` whose request has the message itself, of the media
+upload of ``messages.send``. ::
+
+    uv run python examples/sendmail.py --subject noreply@example.com -t -i < message.eml
+
+.. include:: ../examples/sendmail.py
+   :code: python

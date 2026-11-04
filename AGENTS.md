@@ -422,6 +422,36 @@ processes of their own, as `t/examples/s3.py` of Pyjo-AWS, with
 the XML API with the headers of the metadata, and no credentials, which the
 emulator checks.
 
+`examples/sendmail.py` is `sendmail` of the Gmail API, for `sendmail_path`
+of PHP, cron and the others that pipe a message to it. It reads its options
+by hand, not with `Pyjo.GetOpt`, which would take `-i` of PHP for an
+abbreviation of `--impersonate-service-account`, and ignores the options of
+sendmail that it has no use for, as `-odi` and `-v`. The message goes as it
+comes, with CRLF of RFC 5322 for the LF of PHP, to the media upload of
+`messages.send`, `message/rfc822` of up to 35 MB, which `SendMessage`, a
+subclass of `Pyjo.GCP.Call`, sends as its body, where `raw` of JSON in
+base64 would make it larger. Gmail sends to the recipients of To, Cc and Bcc
+of the message, and has no envelope of its own, so the recipients of the
+arguments that the headers do not have go to a Bcc that the example adds, and
+those of the headers get the message also without `-t`, unlike sendmail.
+
+Its exit code is the one of `sysexits.h`, of which `mail()` of PHP returns
+`false`, but not `EX_TEMPFAIL`: PHP takes it for a message that sendmail
+keeps to send later, and returns `true`, which a check with PHP found, so an
+error of the API that may pass is `EX_UNAVAILABLE` too, as the example keeps
+no message. `mail()` of PHP replaces the bytes of `0x80` to `0x9f` of a
+subject with spaces, which breaks one of UTF-8 that is not encoded, so the
+README of the examples tells PHP to encode it, as RFC 2047 needs anyway.
+
+The Gmail API sends as a user: the subject of the domain-wide delegation of
+a service account, of `signJwt` of an impersonated one without a key, or of
+its key, whose provider of `Pyjo.GCP.Credentials.File` the example gives the
+subject, as google-auth has `with_subject`, or the user of
+`gcloud auth application-default login` with the scope of Gmail.
+`t/examples/sendmail.py` runs it against the Gmail API of its own of
+`GMAIL_EMULATOR_HOST`, which `<SERVICE>_EMULATOR_HOST` of `Pyjo.GCP.Config`
+gives any service, without credentials.
+
 ## Imports of the Package
 
 The modules of the distribution import the package and each other relatively,

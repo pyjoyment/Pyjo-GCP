@@ -8,9 +8,10 @@ metadata server of Compute Engine, GKE or Cloud Run.
 
 ## Layout
 
-| Script   | What it does                                                                    |
-| -------- | ------------------------------------------------------------------------------- |
-| `gcs.py` | serves a bucket of Cloud Storage as a website, an application of Pyjoyment.Lite |
+| Script        | What it does                                                                         |
+| ------------- | ------------------------------------------------------------------------------------ |
+| `gcs.py`      | serves a bucket of Cloud Storage as a website, an application of Pyjoyment.Lite      |
+| `sendmail.py` | sends a message of the standard input with the Gmail API, in the place of `sendmail` |
 
 ## Running
 
@@ -42,3 +43,52 @@ An emulator, as fake-gcs-server, takes no credentials:
 ```sh
 uv run python examples/gcs.py --emulator-host localhost:4443 --bucket mybucket daemon
 ```
+
+## sendmail
+
+`sendmail.py` reads a message from its standard input and sends it with the
+Gmail API, as the user of the credentials, in the place of `sendmail`, with
+its options that PHP, cron and the others give it: `-t` for the recipients of
+the headers, `-i` or `-oi` for a line of a dot that does not end the
+message, `-f` and `-F` for the sender, and the recipients as arguments. Its
+exit code is the one of sendmail, so that `mail()` of PHP returns `false` for
+a message that is not sent.
+
+The Gmail API sends as a user, so the credentials need the scope
+`https://www.googleapis.com/auth/gmail.send` of one. In Google Workspace, a
+service account with the domain-wide delegation of that scope sends as any
+user of the domain, `--subject`, or the environment variable
+`GMAIL_SUBJECT`. With `--impersonate-service-account`, the Application
+Default Credentials impersonate it without a key, and need the role Service
+Account Token Creator on it:
+
+```sh
+uv run python examples/sendmail.py --impersonate-service-account mailer@myproject.iam.gserviceaccount.com \
+  --subject noreply@example.com -t -i < message.eml
+```
+
+or with the key of the service account of `GOOGLE_APPLICATION_CREDENTIALS`:
+
+```sh
+GOOGLE_APPLICATION_CREDENTIALS=mailer.json uv run python examples/sendmail.py --subject noreply@example.com -t -i < message.eml
+```
+
+A user of Gmail sends as itself, with the credentials of
+`gcloud auth application-default login` that have the scope of Gmail, which
+needs an OAuth client of its own, `--client-id-file`:
+
+```sh
+gcloud auth application-default login --client-id-file=client.json \
+  --scopes=https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/cloud-platform
+uv run python examples/sendmail.py -t -i < message.eml
+```
+
+In `php.ini`, the options go after the script, with the Python that has
+Pyjo-GCP installed:
+
+```ini
+sendmail_path = "/opt/pyjo/bin/python /opt/pyjo/examples/sendmail.py --impersonate-service-account mailer@myproject.iam.gserviceaccount.com --subject noreply@example.com -t -i"
+```
+
+The headers of the message are as they come, so a subject of PHP that is not
+ASCII is `mb_encode_mimeheader()` of it, which `mail()` needs anyway.

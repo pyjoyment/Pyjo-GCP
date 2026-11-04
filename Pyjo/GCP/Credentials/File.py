@@ -25,7 +25,11 @@ file of credentials of Google Cloud, as the one of
 
 * ``authorized_user``, of :mod:`Pyjo.GCP.Credentials.AuthorizedUser`,
 * ``service_account``, of :mod:`Pyjo.GCP.Credentials.ServiceAccount`, with
-  the scopes of the provider.
+  the scopes of the provider,
+* ``impersonated_service_account``, of
+  :mod:`Pyjo.GCP.Credentials.Impersonated`, with the scopes of the provider,
+  and its source of the provider of the type of ``source_credentials``, with
+  the scope of IAM.
 
 The quota project of ``GOOGLE_CLOUD_QUOTA_PROJECT`` comes over the one of
 the file, and the file of ``gcloud auth application-default login``, which
@@ -46,10 +50,14 @@ import Pyjo.Exception
 import Pyjo.File
 
 from .. import Config, Credentials
-from . import AuthorizedUser, Provider, ServiceAccount
+from . import AuthorizedUser, Impersonated, Provider, ServiceAccount
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
+
+
+# The types of the source of an impersonated service account, as google-auth has them
+_SOURCES = ('authorized_user', 'service_account', 'external_account_authorized_user')
 
 
 class Pyjo_GCP_Credentials_File(Provider.object):
@@ -147,20 +155,39 @@ class Pyjo_GCP_Credentials_File(Provider.object):
         """
         return self.path == self.config.adc_file()
 
-    def provider_of(self, info: Mapping[str, Any], path: str = 'a file') -> Provider.object:
+    def provider_of(
+        self, info: Mapping[str, Any], path: str = 'a file', *, scopes: Sequence[str] | None = None
+    ) -> Provider.object:
         """::
 
             source = provider.provider_of(info)
 
         A new provider of the JSON object of a file of credentials, of its
-        ``type``, with the user agent and the refresh of this one, or a
+        ``type``, with the user agent and the refresh of this one, and the
+        scopes of the argument or of :attr:`scopes`, or a
         :mod:`Pyjo.Exception` of a type that is not supported.
         """
         kind = info.get('type')
         if kind == 'authorized_user':
             return AuthorizedUser.AuthorizedUser.from_info(info, ua=self.ua, refresh=self.refresh)
         if kind == 'service_account':
-            return ServiceAccount.ServiceAccount.from_info(info, scopes=self.scopes, ua=self.ua, refresh=self.refresh)
+            return ServiceAccount.ServiceAccount.from_info(
+                info, scopes=scopes or self.scopes, ua=self.ua, refresh=self.refresh
+            )
+        if kind == 'impersonated_service_account':
+            value = info.get('source_credentials')
+            source: Mapping[str, Any] = cast(Mapping[str, Any], value) if isinstance(value, Mapping) else {}
+            if source.get('type') not in _SOURCES:
+                raise Pyjo.Exception.new(
+                    f'Unsupported type of the source credentials of Google Cloud {path}: {source.get("type")!r}'
+                )
+            return Impersonated.Impersonated.from_info(
+                info,
+                source=self.provider_of(source, path, scopes=[Impersonated.IAM_SCOPE]),
+                scopes=scopes or self.scopes,
+                ua=self.ua,
+                refresh=self.refresh,
+            )
         raise Pyjo.Exception.new(f'Unsupported type of the credentials of Google Cloud {path}: {kind!r}')
 
 

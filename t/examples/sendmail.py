@@ -202,8 +202,10 @@ try:
                 is_ok(smtp.docmd('BOGUS')[0], 500, 'unknown command')
 
             # The commands of PIPELINING, of a message and of the ones after it, which wait for the reply of the Gmail API
-            with socket.create_connection(('127.0.0.1', smtp_port), timeout=10) as client:
-                stream = client.makefile('rb')
+            with (
+                socket.create_connection(('127.0.0.1', smtp_port), timeout=10) as client,
+                client.makefile('rb') as stream,
+            ):
                 stream.readline()
                 client.sendall(b'EHLO test\r\nMAIL FROM:<app@example.com>\r\nRCPT TO:<bob@example.com>\r\nDATA\r\n')
                 replies = [stream.readline() for _ in range(7)]

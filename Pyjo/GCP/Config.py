@@ -93,7 +93,9 @@ class Pyjo_GCP_Config(Pyjo.Base.object):
 
         Construct a new :mod:`Pyjo.GCP.Config` object.
         """
-        self.config_dir = os.path.expanduser(config_dir or getenv('CLOUDSDK_CONFIG') or _default_dir())
+        self.config_dir = (
+            Pyjo.File.path(config_dir or getenv('CLOUDSDK_CONFIG') or _default_dir()).expanduser().to_str()
+        )
         """::
 
             path = config.config_dir
@@ -116,7 +118,7 @@ class Pyjo_GCP_Config(Pyjo.Base.object):
         """
 
         file = credentials_file or getenv('GOOGLE_APPLICATION_CREDENTIALS')
-        self.credentials_file = os.path.expanduser(file) if file else None
+        self.credentials_file = Pyjo.File.path(file).expanduser().to_str() if file else None
         """::
 
             path = config.credentials_file

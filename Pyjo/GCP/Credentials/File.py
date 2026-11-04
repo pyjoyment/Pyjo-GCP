@@ -31,7 +31,8 @@ file of credentials of Google Cloud, as the one of
   and its source of the provider of the type of ``source_credentials``, with
   the scope of IAM,
 * ``external_account``, of :mod:`Pyjo.GCP.Credentials.IdentityPool`, of a
-  file or a URL, with the scopes of the provider,
+  file or a URL, or :mod:`Pyjo.GCP.Credentials.Pluggable`, of an
+  executable, with the scopes of the provider,
 * ``external_account_authorized_user``, of
   :mod:`Pyjo.GCP.Credentials.ExternalAccountAuthorizedUser`.
 
@@ -54,7 +55,15 @@ import Pyjo.Exception
 import Pyjo.File
 
 from .. import Config, Credentials
-from . import AuthorizedUser, ExternalAccountAuthorizedUser, IdentityPool, Impersonated, Provider, ServiceAccount
+from . import (
+    AuthorizedUser,
+    ExternalAccountAuthorizedUser,
+    IdentityPool,
+    Impersonated,
+    Pluggable,
+    Provider,
+    ServiceAccount,
+)
 
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
@@ -220,7 +229,7 @@ class Pyjo_GCP_Credentials_File(Provider.object):
         if info.get('subject_token_type') == _AWS_SUBJECT_TOKEN_TYPE:
             kind = 'aws'
         elif 'executable' in source:
-            kind = 'executable'
+            return Pluggable.Pluggable.from_info(info, scopes=scopes or self.scopes, ua=self.ua, refresh=self.refresh)
         else:
             return IdentityPool.IdentityPool.from_info(
                 info, scopes=scopes or self.scopes, ua=self.ua, refresh=self.refresh

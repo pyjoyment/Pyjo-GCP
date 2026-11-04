@@ -23,7 +23,8 @@ subject token, which the Security Token Service of Google exchanges for an
 access token, as :rfc:`8693` has it, and which a subclass gets in
 :meth:`~Pyjo_GCP_Credentials_ExternalAccount.subject_token`:
 
-* :mod:`Pyjo.GCP.Credentials.IdentityPool`, of a file or a URL.
+* :mod:`Pyjo.GCP.Credentials.IdentityPool`, of a file or a URL,
+* :mod:`Pyjo.GCP.Credentials.Pluggable`, of an executable.
 
 With ``service_account_impersonation_url``, the token is the one of the
 service account that the federated token impersonates, of
@@ -368,14 +369,13 @@ class Pyjo_GCP_Credentials_ExternalAccount(Provider.object):
         """
         if self._impersonated is None:
             url = self.service_account_impersonation_url or ''
-            start, end = url.rfind('/'), url.find(':generateAccessToken')
-            if start == -1 or end == -1 or start > end:
+            if (target := self.service_account()) is None:
                 raise Pyjo.Exception.new(
                     f'Invalid credentials of an external account: no service account in {url!r}'
                 )  # fmt: skip
             self._impersonated = Impersonated.new(
                 source=_Federated(self, ua=self.ua, refresh=self.refresh),
-                target_principal=url[start + 1 : end],
+                target_principal=target,
                 scopes=self.scopes,
                 lifetime=self.lifetime,
                 quota_project=self.quota_project,
@@ -384,6 +384,19 @@ class Pyjo_GCP_Credentials_ExternalAccount(Provider.object):
                 refresh=self.refresh,
             )
         return self._impersonated
+
+    def service_account(self) -> str | None:
+        """::
+
+            email = provider.service_account()
+
+        The email of the service account of
+        :attr:`service_account_impersonation_url`, between its last ``/`` and
+        ``:generateAccessToken``, or ``None``.
+        """
+        url = self.service_account_impersonation_url or ''
+        start, end = url.rfind('/'), url.find(':generateAccessToken')
+        return url[start + 1 : end] if start != -1 and end != -1 and start < end else None
 
     async def subject_token(self) -> str:
         """::

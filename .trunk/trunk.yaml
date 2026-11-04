@@ -1,0 +1,147 @@
+# This file controls the behavior of Trunk: https://docs.trunk.io/cli
+# To learn more about the format of this file, see https://docs.trunk.io/reference/trunk-yaml
+version: 0.1
+cli:
+  version: 1.29.0
+# Trunk provides extensibility via plugins. (https://docs.trunk.io/plugins)
+plugins:
+  sources:
+    - id: trunk
+      ref: v1.11.0
+      uri: https://github.com/trunk-io/plugins
+# Many linters and tools depend on runtimes - configure them here. (https://docs.trunk.io/runtimes)
+runtimes:
+  enabled:
+    - node@24.21.0
+    - python@3.14.4
+# actionlint comes from the maintained fork of kjanat, which continues the
+# releases of rhysd/actionlint after 1.7.12 with the same names of the files,
+# where the plugin downloads them from rhysd/actionlint.
+downloads:
+  - name: actionlint
+    downloads:
+      - os:
+          linux: linux
+          macos: darwin
+        cpu:
+          x86_64: amd64
+          arm_64: arm64
+        url: https://github.com/kjanat/actionlint/releases/download/v${version}/actionlint_${version}_${os}_${cpu}.tar.gz
+      - os: windows
+        cpu:
+          x86_64: amd64
+          arm_64: arm64
+        url: https://github.com/kjanat/actionlint/releases/download/v${version}/actionlint_${version}_windows_${cpu}.zip
+# This is the section where you manage your linters. (https://docs.trunk.io/check/configuration)
+lint:
+  definitions:
+    # Biome formats and lints CSS, HTML, JavaScript, JSON, Markdown and YAML,
+    # with biome.jsonc. parse_regex is matched against the whole output of a
+    # batch, so `^` needs `(?m)` to match at every line; without it Trunk
+    # reports only the first issue that Biome prints. Trunk runs Biome on a copy
+    # of the files in a sandbox outside the repository, with a copy of
+    # biome.jsonc of direct_configs, not --config-path of the one of the
+    # repository, as Biome takes the options of its parser, as the front matter
+    # of Markdown, only for the files under the directory of its
+    # configuration. The sandbox has no .gitignore, which vcs.useIgnoreFile
+    # reads, so the commands turn it off, as Trunk applies .gitignore itself,
+    # and --no-errors-on-unmatched passes a file that biome.jsonc leaves out.
+    - name: biome
+      direct_configs:
+        - biome.jsonc
+      files:
+        - css
+        - html
+        - javascript
+        - json
+        - markdown
+        - yaml
+      commands:
+        - output: regex
+          success_codes:
+            - 0
+            - 1
+          batch: true
+          cache_results: false
+          name: lint
+          parse_regex: (?m)^::(?P<severity>.*) title=(?P<code>[^,]+),file=(?P<path>[^,]+),line=(?P<line>[^,]+),endLine=[^,]+,col=(?P<col>[^,]+),endColumn=[^:]+::(?P<message>.*)
+          read_output_from: stdout
+          run: biome check --vcs-use-ignore-file=false --reporter=github --no-errors-on-unmatched ${target}
+          run_from: ${root_or_parent_with(biome.jsonc)}
+        - output: regex
+          success_codes:
+            - 0
+          batch: true
+          cache_results: false
+          formatter: true
+          name: fmt
+          parse_regex: (?m)^::(?P<severity>.*) title=(?P<code>[^,]+),file=(?P<path>[^,]+),line=(?P<line>[^,]+),endLine=[^,]+,col=(?P<col>[^,]+),endColumn=[^:]+::(?P<message>.*)
+          read_output_from: stdout
+          run: biome format --vcs-use-ignore-file=false --reporter=github --write --no-errors-on-unmatched ${target}
+          run_from: ${root_or_parent_with(biome.jsonc)}
+      run_timeout: 1m
+  enabled:
+    - actionlint@1.17.0
+    # Renovate bumps it, and Biome Migrate migrates biome.jsonc on its branch;
+    # the ! keeps it from trunk upgrade
+    - biome@2.6.4! # datasource=npm depName=@biomejs/biome
+    - git-diff-check
+    - pyright@1.1.414
+    # The format command of ruff is disabled in the plugin by default
+    - ruff@0.17.3:
+        commands:
+          - lint
+          - format
+    - taplo@0.10.0
+    # yamllint checks what Biome does not, as the duplicated keys and the
+    # values that YAML 1.1 reads otherwise
+    - yamllint@1.38.0
+  disabled:
+    # bandit: security checks for Python code; not used here
+    - bandit
+    # black: Python formatter; ruff formats the code
+    - black
+    # checkov: scanner for infrastructure as code; there is none here
+    - checkov
+    # isort: sorts Python imports; ruff sorts them (rule I)
+    - isort
+    # markdownlint: lints Markdown; Biome formats it and has its rules that are
+    # not about formatting
+    - markdownlint
+    # pinact: pins GitHub Actions to commit hashes; the actions are pinned by
+    # their tags, as in Pyjoyment
+    - pinact
+    # prettier: formats CSS, HTML, JavaScript, JSON, Markdown and YAML; Biome
+    # formats them
+    - prettier
+    # renovate: validates the Renovate configuration; Renovate validates it
+    # itself on every run, and the linter is a heavy npm package
+    - renovate
+    # trivy: scanner for containers, infrastructure as code and dependencies;
+    # nothing to scan here
+    - trivy
+    # trufflehog: secret scanner; not needed here
+    - trufflehog
+    # yamlfmt: formats YAML; Biome formats it
+    - yamlfmt
+  ignore:
+    # Rewritten by trunk upgrade
+    - linters:
+        - biome
+      paths:
+        - .trunk/trunk.yaml
+    # Examples, tests and docs/conf.py, outside the package: pyright takes
+    # the regular package Pyjo of Pyjoyment for them, which hides Pyjo.GCP of
+    # the checkout; the package itself is checked, strictly
+    - linters:
+        - pyright
+      paths:
+        - docs/**
+        - examples/**
+        - t/**
+actions:
+  enabled:
+    - trunk-announce
+    - trunk-check-pre-push
+    - trunk-fmt-pre-commit
+    - trunk-upgrade-available

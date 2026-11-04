@@ -1,0 +1,194 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "*"
+  workflow_dispatch:
+    inputs:
+      pyjoyment-ref:
+        description: The branch, tag or commit of Pyjoyment to test against, or the release of uv.lock
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  # The tests of the distribution, against the release of Pyjoyment of
+  # uv.lock. Not the suite of Pyjoyment, which nothing of the distribution
+  # changes, unlike the one of a reactor, which runs on it.
+  prove:
+    name: prove (python ${{ matrix.python }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python:
+          - "3.12"
+          - "3.13"
+          - "3.14"
+          - "3.15"
+          - 3.15t
+          - pypy3.12
+
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          path: Pyjo-GCP
+
+      # The ref of a dispatch, whose checkout is laid over the release with
+      # `--with-editable`, so that the checkout is what is tested.
+      - name: Checkout Pyjoyment
+        if: ${{ inputs.pyjoyment-ref }}
+        uses: actions/checkout@v7
+        with:
+          repository: pyjoyment/Pyjoyment
+          ref: ${{ inputs.pyjoyment-ref }}
+          path: Pyjoyment
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: 0.13.6 # datasource=github-releases depName=astral-sh/uv
+
+      - name: Install
+        working-directory: Pyjo-GCP
+        run: uv sync --python "$(command -v python)"
+
+      # As in Pyjoyment: invalid escape sequences and deprecated APIs fail, and
+      # the ResourceWarning of the development mode of Python, which only goes
+      # to the standard error, is checked in the output.
+      - name: Run the tests of the distribution
+        working-directory: Pyjo-GCP
+        shell: bash
+        env:
+          PYTHONDEVMODE: "1"
+          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
+          PYJOYMENT: ${{ inputs.pyjoyment-ref && '../Pyjoyment' || '' }}
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/junit"
+          uv run ${PYJOYMENT:+--with-editable "$PYJOYMENT"} python -m Pyjo.Prove -l --color --timeout 60 --capture-stderr --formatter "junit=$GITHUB_WORKSPACE/junit/pyjo-gcp.xml" --formatter "markdown=$GITHUB_STEP_SUMMARY" -r t 2>&1 | tee prove.log
+          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
+
+      # As in Pyjoyment: the JUnit XML of the harness, as the annotations of the
+      # failed tests, without a check of its own, and without the summary of the
+      # job, which the harness writes itself with its formatter markdown
+      - name: Publish the report of the tests
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: junit/*.xml
+          annotate_only: true
+          job_summary: false
+          include_skipped: false
+
+      # The JUnit XML for the summary of the summaries of all the jobs, which
+      # the job report makes
+      - name: Upload the report of the tests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-prove (python ${{ matrix.python }})
+          path: junit/*.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The summary of the summaries of the jobs of the tests, from the JUnit XML
+  # that they upload, as the summary of this job and as a comment of the pull
+  # request, which each run edits, as in Pyjoyment, with the script of its
+  # checkout of main, which needs Pyjo.DOM. A pull request of a fork has a
+  # token that cannot comment.
+  report:
+    name: report
+    needs:
+      - prove
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout Pyjoyment
+        uses: actions/checkout@v7
+        with:
+          repository: pyjoyment/Pyjoyment
+          ref: main
+          path: Pyjoyment
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: 3.15.2
+          allow-prereleases: true
+
+      - name: Download the reports of the tests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: junit-*
+          path: reports
+
+      # The names and the URLs of the jobs of the run, of its latest attempt,
+      # which link the jobs of the summary
+      - name: Summary of the reports
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONPATH: Pyjoyment
+        run: |-
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --jq '.jobs[] | [.name, .html_url] | @tsv' > jobs.tsv
+          python Pyjoyment/.github/scripts/test-report.py reports jobs.tsv > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+      # The comment that starts with the marker of the report, edited, or a new one
+      - name: Comment on the pull request
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name ==
+          github.repository }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |-
+          id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --jq '.[] | select(.body | startswith("<!-- pyjo-prove-report -->")) | .id' | head -n 1)"
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@report.md > /dev/null
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@report.md > /dev/null
+          fi
+
+  # The one check that the ruleset of main requires, whatever the matrix has,
+  # as in Pyjoyment: it fails when a job failed or was cancelled, so a new
+  # version of Python needs no change of the ruleset.
+  tests:
+    name: Tests
+    needs:
+      - prove
+    if: always()
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 5
+
+    steps:
+      - name: Check the results of the jobs
+        shell: bash
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |-
+          echo "$RESULTS"
+          for result in $RESULTS; do
+            test "$result" = success
+          done

@@ -66,7 +66,7 @@ from . import Call, Config, Credentials, Steps
 from .Credentials import Provider
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 
 class Pyjo_GCP_Client(Pyjo.Base.object):
@@ -84,6 +84,7 @@ class Pyjo_GCP_Client(Pyjo.Base.object):
         config: Config.object | None = None,
         credentials: Provider.object | None = None,
         scopes: Sequence[str] | None = None,
+        quota_project: str | Literal[False] | None = None,
         ua: Pyjo.UserAgent.object | None = None,
     ) -> None:
         """::
@@ -140,6 +141,21 @@ class Pyjo_GCP_Client(Pyjo.Base.object):
 
         The user agent of the requests, a new :mod:`Pyjo.UserAgent` object by
         default.
+        """
+
+        self.quota_project = quota_project
+        """::
+
+            project = client.quota_project
+            client.quota_project = False
+
+        The quota project of ``x-goog-user-project``, over the one of the
+        credentials, ``False`` for none, or ``None``, for the one of the
+        credentials, as ``client_options.quota_project_id`` of the client
+        libraries of Google. A client of Cloud Storage that serves the
+        objects of its own bucket needs none: Cloud Storage bills a request
+        with one to that project, as the one of a bucket of requester pays,
+        and gives its response ``Cache-Control: no-cache`` then.
         """
 
         # Chain imports the providers of the files, of which the impersonated service account imports this module
@@ -199,8 +215,9 @@ class Pyjo_GCP_Client(Pyjo.Base.object):
             headers = client.headers(credentials)
 
         The headers of a request with credentials, ``Authorization`` of the
-        token, and ``x-goog-user-project`` of the quota project, as
-        google-auth has them, or a :mod:`Pyjo.Exception` of credentials of
+        token, and ``x-goog-user-project`` of the quota project of
+        :attr:`quota_project` or of the credentials, as google-auth has them,
+        or a :mod:`Pyjo.Exception` of credentials of
         another universe domain than the one of the endpoint.
         """
         domain = credentials.universe_domain
@@ -210,8 +227,9 @@ class Pyjo_GCP_Client(Pyjo.Base.object):
                 f' {universe}: GOOGLE_CLOUD_UNIVERSE_DOMAIN'
             )
         headers = {'Authorization': f'Bearer {credentials.token}'}
-        if credentials.quota_project:
-            headers['x-goog-user-project'] = credentials.quota_project
+        quota_project = credentials.quota_project if self.quota_project is None else self.quota_project
+        if isinstance(quota_project, str) and quota_project:
+            headers['x-goog-user-project'] = quota_project
         return headers
 
     def steps(self, call: Call.object, credentials: Credentials.object | None = None) -> Steps.object[Any]:

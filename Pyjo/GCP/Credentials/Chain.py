@@ -26,7 +26,9 @@ them, in the order of AIP-4110 by default:
 #. the file of the ``GOOGLE_APPLICATION_CREDENTIALS`` environment variable,
    of :mod:`Pyjo.GCP.Credentials.File`,
 #. the file of ``gcloud auth application-default login``, of
-   :mod:`Pyjo.GCP.Credentials.File`.
+   :mod:`Pyjo.GCP.Credentials.File`,
+#. the metadata server of Compute Engine, GKE, Cloud Run and Cloud
+   Functions, of :mod:`Pyjo.GCP.Credentials.Metadata`.
 
 The project of the ``GOOGLE_CLOUD_PROJECT`` environment variable, or of
 ``GCLOUD_PROJECT``, comes over the one of the credentials, as google-auth has
@@ -48,7 +50,7 @@ Classes
 """
 
 from .. import Config, Credentials
-from . import File, Provider
+from . import File, Metadata, Provider
 
 from collections.abc import Sequence
 from typing import Any
@@ -115,12 +117,14 @@ class Pyjo_GCP_Credentials_Chain(Provider.object):
 
         New providers of the Application Default Credentials, with
         :attr:`config`, :attr:`scopes` and the user agent of the chain, in
-        their order.
+        their order, but the metadata server, which has a user agent of its
+        own, with a short timeout.
         """
         options: dict[str, Any] = {'config': self.config, 'scopes': self.scopes, 'ua': self.ua, 'refresh': self.refresh}
         return [
             File.new(path=self.config.credentials_file, **options),
             File.new(path=self.config.adc_file(), optional=True, **options),
+            Metadata.new(scopes=self.scopes, refresh=self.refresh),
         ]
 
     async def fetch(self) -> Credentials.object | None:

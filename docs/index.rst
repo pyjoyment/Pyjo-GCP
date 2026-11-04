@@ -18,5 +18,7 @@
     api/Pyjo_GCP_Credentials_Chain
     api/Pyjo_GCP_Credentials_File
     api/Pyjo_GCP_Credentials_Provider
+    api/Pyjo_GCP_Credentials_ServiceAccount
     api/Pyjo_GCP_Error
+    api/Pyjo_GCP_RSA
     api/Pyjo_GCP_Steps

@@ -67,10 +67,11 @@ where Google Cloud differs:
 
 What differs is the authorization: Google Cloud takes a bearer token of OAuth
 2.0 in `Authorization`, not a signature of each request, so the credentials of
-Pyjo-GCP are a token with its expiration, and the client adds the header in
-the event `start` of its user agent. The JSON APIs of Google share one
-protocol, with the error of `google.rpc.Status`, so the client needs no class
-of a protocol of each kind of API, as Pyjo-AWS does.
+Pyjo-GCP are a token with its expiration, and the client adds the header to
+the request of the call before it starts. The JSON APIs of Google share one
+protocol, with the error of `google.rpc.Status`, so the client needs one class
+of a call, `Pyjo.GCP.Call`, not one of a protocol of each kind of API, as
+Pyjo-AWS does.
 
 Pyjo-GCP does not depend on Pyjo-AWS: a module that both need, as the steps,
 is copied, until it has a distribution of its own or a place in Pyjoyment.
@@ -151,6 +152,37 @@ The token endpoints of OAuth 2.0 answer the same way, the token endpoint of
 Google, the STS of Google and the metadata server alike: `access_token` and
 `expires_in`, or `error` and `error_description`, which `parse_token` of
 `Pyjo.GCP.Credentials.Provider` reads for them all.
+
+## The Client
+
+`Pyjo.GCP.Client` is the one of Pyjo-AWS: read the section The Client of
+`../Pyjo-AWS/AGENTS.md` for the call as an object that builds its
+transaction and reads its result, `steps` that a provider of credentials
+awaits, and the credentials of `credentials_p` that calls at once share.
+`t/GCP_Client.py` takes a relative endpoint for the same reason.
+
+The token goes into the headers of the request when the call has built it,
+not in the event `start` of the user agent, where Pyjo-AWS signs its request:
+a signature needs the complete request, with its absolute URL, and a bearer
+token does not. `x-goog-user-project` of the quota project goes with it, as
+`apply` of the credentials of google-auth adds it.
+
+The endpoint is `https://<service>.<universe domain>` of `Pyjo.GCP.Config`,
+or its emulator, which makes the client `anonymous`, as the client library
+of Cloud Storage calls `STORAGE_EMULATOR_HOST` without credentials; an
+`endpoint` of the client is neither, as a server of a test that checks the
+token. Credentials of another universe domain than the one of the
+configuration are an error, as `_validate_universe_domain` of
+google-api-core has it, but for an `endpoint` of the client.
+
+`Pyjo.GCP.Call` reads the error of the older format too, of Cloud Storage and
+the APIs of the discovery documents, without `status` and with `errors`,
+whose `reason` it takes, or the one of `google.rpc.ErrorInfo` of `details`.
+The code of `Pyjo.GCP.Error` is the status of HTTP, as `error.code` of the
+JSON APIs is, not the `google.rpc.Code` of gRPC. A name of an object of Cloud
+Storage is one segment of the path of the JSON API, with its slashes
+percent-encoded, which the router of Pyjoyment decodes, so the route of an
+object in a test is a wildcard, `<*name>`.
 
 ## Imports of the Package
 

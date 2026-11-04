@@ -47,11 +47,18 @@ pip install git+https://github.com/pyjoyment/Pyjo-GCP
 
 ## Examples
 
-[`examples/`](examples) has applications of Pyjoyment.Lite that call Google
-Cloud, as a bucket of Cloud Storage as a website:
+[`examples/`](examples) has scripts that call Google Cloud, as a bucket of
+Cloud Storage as a website, an application of Pyjoyment.Lite:
 
 ```sh
 uv run python examples/gcs.py --bucket mybucket daemon
+```
+
+or a message sent with the Gmail API, in the place of `sendmail`, also for
+`mail()` of PHP:
+
+```sh
+uv run python examples/sendmail.py --subject noreply@example.com -t -i < message.eml
 ```
 
 ## Documentation

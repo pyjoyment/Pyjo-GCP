@@ -305,13 +305,13 @@ their calls need mTLS too, of `*.mtls.googleapis.com`, which the client has
 not.
 
 `t/GCP_Credentials_X509.py` serves the STS over TLS in a process of its own,
-with the certificate of the servers of Pyjoyment, `Pyjo/IOLoop/certs`, and
-takes the requests with the certificate of the workload only. That one is not
-the one of Pyjoyment, whose `extendedKeyUsage` of `serverAuth` a server does
-not take of a client, so `Key.certificate` of `t/lib/Key.py` makes it when
-the test runs, self-signed with RS256 of `Pyjo.GCP.RSA` with the key of the
-tests, with `basicConstraints` of an authority, so that the server takes it as
-its own trust anchor; no certificate of the tests is in the repository.
+with the certificates of the package of Pyjoyment, `Pyjo/IOLoop/certs`:
+`server.crt` of the server, which takes the requests with `client.crt` only,
+the certificate of the workload, as `ca.crt` signs both, and the user agent of
+the test takes it as its authority. `server.crt` is of `serverAuth` only,
+which a server does not take of a client, so the certificate of a client
+comes from Pyjoyment since `6aa1e72` of `uv.lock`, and no certificate of the
+tests is in the repository.
 
 The exchange is the one of `sts.py` and RFC 8693: the form of `grant_type`,
 `audience`, `scope`, `requested_token_type`, `subject_token` and

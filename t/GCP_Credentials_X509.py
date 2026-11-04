@@ -9,10 +9,8 @@ import Pyjo.UserAgent
 
 from Pyjo.GCP.Credentials.IdentityPool import IdentityPool
 from Pyjo.Test import *
-from Pyjo.Util import b64_encode
 
 import contextlib
-import importlib
 import os
 import re
 import socket
@@ -22,23 +20,16 @@ import time
 
 
 # The credentials of an external account of a certificate of X.509, of Workload Identity Federation with mTLS, against
-# the STS of Google of its own over TLS in a process of its own, with the certificate of the servers of Pyjoyment, which
-# takes the requests with the certificate of the workload of the test only, made of its key when it runs, as the one of
-# Pyjoyment is of serverAuth, which a server does not take of a client
-
-sys.path.insert(0, Pyjo.File.curfile().dirname().child('lib').to_str())
-Key = importlib.import_module('Key')
+# the STS of Google of its own over TLS in a process of its own, with the certificates of the package of Pyjoyment: the
+# server of server.crt, which takes the requests with client.crt only, the certificate of the workload, as ca.crt signs
+# both
 
 tmp = Pyjo.File.tempdir()
 
-LEAF = Key.certificate('localhost', 1)
-CA = Key.certificate('Pyjo-GCP test CA', 2)
-CERT = tmp.child('cert.pem').spew(Key.pem('CERTIFICATE', LEAF))
-KEY = tmp.child('key.pem').spew(Key.pem('PRIVATE KEY', Key.PKCS8))
-CHAIN = tmp.child('chain.pem').spew(Key.pem('CERTIFICATE', LEAF) + Key.pem('CERTIFICATE', CA))
-WRONG_CHAIN = tmp.child('wrong-chain.pem').spew(Key.pem('CERTIFICATE', CA) + Key.pem('CERTIFICATE', LEAF))
-TWO = tmp.child('two.pem').spew(Key.pem('CERTIFICATE', LEAF) + Key.pem('CERTIFICATE', CA))
-SERVER_CA = Pyjo.File.path(Pyjo.IOLoop.TLS.CERT).sibling('ca.crt').to_str()
+CERTS = Pyjo.File.path(Pyjo.IOLoop.TLS.CERT).dirname()
+CA, CERT, KEY = (CERTS.child(name).to_str() for name in ('ca.crt', 'client.crt', 'client.key'))
+CHAIN = tmp.child('chain.pem').spew(Pyjo.File.path(CERT).slurp() + Pyjo.File.path(CA).slurp())
+WRONG_CHAIN = tmp.child('wrong-chain.pem').spew(Pyjo.File.path(CA).slurp() + Pyjo.File.path(CERT).slurp())
 
 AUDIENCE = '//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/x509'
 TARGET = 'reader@myproject.iam.gserviceaccount.com'
@@ -83,7 +74,7 @@ def listen():
 
 port, base = listen()
 server = subprocess.Popen(
-    [sys.executable, str(SERVER), 'daemon', '-l', f'{base}?ca={CERT}'],
+    [sys.executable, str(SERVER), 'daemon', '-l', f'{base}?ca={CA}'],
     stdout=subprocess.DEVNULL,
     stderr=subprocess.DEVNULL,
 )
@@ -98,10 +89,10 @@ while True:
             raise
         time.sleep(0.1)
 
-# The user agent of the provider, of the authority of the certificate of Pyjoyment, to which the provider adds the
-# certificate of the workload; the one of the test presents it too, as the server takes no request without it
-ua = Pyjo.UserAgent.new(ca=SERVER_CA, max_connections=0)
-control = Pyjo.UserAgent.new(ca=SERVER_CA, cert=str(CERT), key=str(KEY), max_connections=0)
+# The user agent of the provider, of the authority of Pyjoyment, to which the provider adds the certificate of the
+# workload; the one of the test presents it too, as the server takes no request without it
+ua = Pyjo.UserAgent.new(ca=CA, max_connections=0)
+control = Pyjo.UserAgent.new(ca=CA, cert=CERT, key=KEY, max_connections=0)
 
 
 def calls():
@@ -110,9 +101,7 @@ def calls():
 
 def config(name='certificate_config.json', **workload):
     path = tmp.child(name)
-    path.spew(
-        Pyjo.JSON.to_json({'cert_configs': {'workload': {'cert_path': str(CERT), 'key_path': str(KEY), **workload}}})
-    )
+    path.spew(Pyjo.JSON.to_json({'cert_configs': {'workload': {'cert_path': CERT, 'key_path': KEY, **workload}}}))
     return str(path)
 
 
@@ -156,8 +145,14 @@ def provider_of(fields):
     return provider
 
 
-def token(*certificates):
-    return '[' + ','.join(f'"{b64_encode(der, "")}"' for der in certificates) + ']'
+# The subject token of certificates of PEM, each one in Base64 of DER, which is the one of the PEM without its lines
+def token(*paths):
+    certificates = []
+    for path in paths:
+        pem = Pyjo.File.path(path).slurp('UTF-8') or ''
+        body = pem.split('-----BEGIN CERTIFICATE-----')[1].split('-----END CERTIFICATE-----')[0]
+        certificates.append('"' + ''.join(body.split()) + '"')
+    return '[' + ','.join(certificates) + ']'
 
 
 try:
@@ -165,26 +160,26 @@ try:
         with subtest('Exchange of mTLS'):
             provider = provider_of(info())
             ok(isinstance(provider, IdentityPool) and provider.certificate, 'identity pool of a certificate')
-            is_ok((provider.ua.cert, provider.ua.key), (str(CERT), str(KEY)), 'user agent of the certificate')
+            is_ok((provider.ua.cert, provider.ua.key), (CERT, KEY), 'user agent of the certificate')
             credentials = provider.credentials()
             is_ok((credentials.token, credentials.project), ('ya29.x509', 'myproject'), 'token over mTLS')
             form = calls()[-1]['form']
             is_ok(
                 (form['subject_token_type'], form['subject_token']),
-                ('urn:ietf:params:oauth:token-type:mtls', token(LEAF)),
+                ('urn:ietf:params:oauth:token-type:mtls', token(CERT)),
                 'subject token of the certificate, in Base64 of DER',
             )
             result = wait(provider_of(info()).credentials_p())
             is_ok(result['value'].token, 'ya29.x509', 'token, non-blocking')
 
             throws_ok(
-                lambda: Pyjo.UserAgent.new(ca=SERVER_CA, max_connections=0).post(f'{base}/v1/token').result,
+                lambda: Pyjo.UserAgent.new(ca=CA, max_connections=0).post(f'{base}/v1/token').result,
                 re.compile(r''),
                 'no request of the server without the certificate',
             )
 
             provider_of(info(trust_chain_path=str(CHAIN))).credentials()
-            is_ok(calls()[-1]['form']['subject_token'], token(LEAF, CA), 'trust chain after the certificate, once')
+            is_ok(calls()[-1]['form']['subject_token'], token(CERT, CA), 'trust chain after the certificate, once')
 
             url = f'{base}/v1/projects/-/serviceAccounts/{TARGET}:generateAccessToken'
             credentials = provider_of({**info(), 'service_account_impersonation_url': url}).credentials()
@@ -192,7 +187,7 @@ try:
 
         with subtest('Configuration of the certificate'):
             provider = provider_of(info())
-            is_ok(provider.certificate_paths(), (str(CERT), str(KEY)), 'configuration of the file')
+            is_ok(provider.certificate_paths(), (CERT, KEY), 'configuration of the file')
 
             with environ(GOOGLE_API_CERTIFICATE_CONFIG=config('env.json')):
                 default = info(certificate_config_location=None, use_default_certificate_config=True)
@@ -238,9 +233,9 @@ try:
 
             throws_ok(
                 lambda: provider_of(
-                    info(certificate_config_location=config('two.json', cert_path=str(TWO)))
+                    info(certificate_config_location=config('two.json', cert_path=str(CHAIN)))
                 ).credentials(),
-                re.compile(r'^Invalid certificate of an external account: not one certificate of PEM in \S+two\.pem'),
+                re.compile(r'^Invalid certificate of an external account: not one certificate of PEM in \S+chain\.pem'),
                 'file of more than one certificate',
             )
             throws_ok(

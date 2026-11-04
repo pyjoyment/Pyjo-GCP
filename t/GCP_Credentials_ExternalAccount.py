@@ -258,12 +258,12 @@ with environ():
         invalid = [
             ({}, r"^Invalid credentials of an external account: no audience, subject_token_type$"),
             ({**info(), 'credential_source': None}, r'^Invalid credentials of an external account: no credential_source'),
-            (info(credential_source={}), r'no file or url of the credential_source'),
-            (info(credential_source={'file': 'a', 'url': 'b'}), r'both a file and a url of the credential_source'),
+            (info(credential_source={}), r'one of a file, a url and a certificate of the credential_source'),
+            (info(credential_source={'file': 'a', 'url': 'b'}), r'one of a file, a url and a certificate of the credential_source'),
             (info(credential_source={'file': 'a', 'format': {'type': 'xml'}}), r"the format of the credential_source 'xml'"),
             (info(credential_source={'file': 'a', 'format': {'type': 'json'}}), r'no subject_token_field_name'),
             (info(credential_source={'environment_id': 'azure1', 'file': 'a'}), r"the environment_id of an identity pool 'azure1'"),
-            (info(credential_source={'certificate': {}}), r'^Unsupported credential_source of an external account: certificate of X\.509'),
+            (info(credential_source={'certificate': {}}), r'one of certificate_config_location and use_default_certificate_config'),
             (info(workforce_pool_user_project='p'), r'a workforce_pool_user_project of an audience that is not of a workforce pool'),
         ]  # fmt: skip
         for fields, error in invalid:

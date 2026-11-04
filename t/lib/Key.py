@@ -75,6 +75,34 @@ PKCS1 = sequence(
 PKCS8 = sequence(integer(0), RSA_ENCRYPTION, tlv(0x04, PKCS1))
 PUBLIC = sequence(RSA_ENCRYPTION, tlv(0x03, b'\x00' + sequence(integer(N), integer(E))))
 
+SHA256_WITH_RSA = sequence(tlv(0x06, bytes.fromhex('2a864886f70d01010b')), tlv(0x05, b''))
+
+
+# A certificate of X.509 of the key, self-signed with RS256 of Pyjo.GCP.RSA, made when a test runs, as no certificate of
+# the tests is in the repository: a name of its common name, an authority of basicConstraints, so that a peer of TLS
+# takes it as its own trust anchor, and subjectAltName of localhost and 127.0.0.1, of the servers of the tests
+def certificate(common_name, serial=1):
+    import Pyjo.GCP.RSA
+
+    name = sequence(tlv(0x31, sequence(tlv(0x06, bytes.fromhex('550403')), tlv(0x0C, common_name.encode()))))
+    names = sequence(tlv(0x82, b'localhost'), tlv(0x87, bytes([127, 0, 0, 1])))
+    extensions = sequence(
+        sequence(tlv(0x06, bytes.fromhex('551d13')), tlv(0x01, b'\xff'), tlv(0x04, sequence(tlv(0x01, b'\xff')))),
+        sequence(tlv(0x06, bytes.fromhex('551d11')), tlv(0x04, names)),
+    )
+    tbs = sequence(
+        tlv(0xA0, integer(2)),
+        integer(serial),
+        SHA256_WITH_RSA,
+        name,
+        sequence(tlv(0x17, b'250101000000Z'), tlv(0x18, b'20991231235959Z')),
+        name,
+        PUBLIC,
+        tlv(0xA3, extensions),
+    )
+    signature = Pyjo.GCP.RSA.new(N, E, D, P, Q).sign(tbs)
+    return sequence(tbs, SHA256_WITH_RSA, tlv(0x03, b'\x00' + signature))
+
 
 if __name__ == '__main__':
     from Pyjo.Test import plan

@@ -277,8 +277,41 @@ URL, `Pyjo.GCP.Credentials.Pluggable` of `pluggable.py`, of an executable,
 and `Pyjo.GCP.Credentials.AWS` of `aws.py`, of AWS. `provider_of` of `Pyjo.GCP.Credentials.File` tells the kind of
 `external_account` as `_get_external_account_credentials` of `_default.py`
 does: AWS of its `subject_token_type`, an executable of `executable` of
-`credential_source`, an identity pool otherwise, whose `certificate` of
-X.509 is not supported.
+`credential_source`, an identity pool otherwise, of a file, a URL or a
+`certificate` of X.509.
+
+The `certificate` of `Pyjo.GCP.Credentials.IdentityPool` is the one of
+`identity_pool.py` with `_mtls_helper.py`: the files of `cert_path` and
+`key_path` of `cert_configs.workload` of the configuration of
+`certificate_config_location`, or of `GOOGLE_API_CERTIFICATE_CONFIG`, of
+`CLOUDSDK_CONTEXT_AWARE_CERTIFICATE_CONFIG_FILE_PATH`, or of
+`~/.config/gcloud/certificate_config.json`, as it is, not of
+`CLOUDSDK_CONFIG`, as google-auth has it, with the well-known files of Cloud
+Run for the paths of its configuration that gcloud wrote before. The subject
+token is the JSON array of the certificate and of the ones of
+`trust_chain_path` after it, without the certificate itself at the top of the
+chain, in Base64 of their DER, which is the Base64 of the PEM without its
+lines, so that no parser of X.509 is needed; the JSON is written as it is, as
+`Pyjo.JSON` would write the slashes of Base64 as `\/`.
+
+The requests of the provider present the certificate with the key of the
+workload, of mTLS, as `functools.partial(request, cert=...)` of google-auth
+does for the exchange and the impersonation, with a user agent of its own,
+as `Pyjo.UserAgent` has its certificate for all its requests: the one of the
+argument gives it its authority and its checks only. The tokens bound to the
+certificate of an agent identity, `bindCertFingerprint` of the exchange of a
+certificate with the SPIFFE of the agents in its SAN, are not supported, as
+their calls need mTLS too, of `*.mtls.googleapis.com`, which the client has
+not.
+
+`t/GCP_Credentials_X509.py` serves the STS over TLS in a process of its own,
+with the certificate of the servers of Pyjoyment, `Pyjo/IOLoop/certs`, and
+takes the requests with the certificate of the workload only. That one is not
+the one of Pyjoyment, whose `extendedKeyUsage` of `serverAuth` a server does
+not take of a client, so `Key.certificate` of `t/lib/Key.py` makes it when
+the test runs, self-signed with RS256 of `Pyjo.GCP.RSA` with the key of the
+tests, with `basicConstraints` of an authority, so that the server takes it as
+its own trust anchor; no certificate of the tests is in the repository.
 
 The exchange is the one of `sts.py` and RFC 8693: the form of `grant_type`,
 `audience`, `scope`, `requested_token_type`, `subject_token` and

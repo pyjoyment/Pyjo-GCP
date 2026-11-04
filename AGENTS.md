@@ -153,6 +153,36 @@ Google, the STS of Google and the metadata server alike: `access_token` and
 `expires_in`, or `error` and `error_description`, which `parse_token` of
 `Pyjo.GCP.Credentials.Provider` reads for them all.
 
+## The Service Accounts
+
+`Pyjo.GCP.Credentials.ServiceAccount` is `google/oauth2/service_account.py`
+of google-auth. The grant of RFC 7523 posts a JWT of the email, the scopes
+and the subject of the domain-wide delegation, of an hour, whose audience is
+`https://oauth2.googleapis.com/token` also when `token_uri` of the key is
+another endpoint, as google-auth has it, to `token_uri`. The self-signed JWT
+of AIP-4111 is the token itself, with `iss` and `sub` of the email and the
+scopes in `scope`, without `aud`, as `always_use_jwt_access` of google-auth
+makes it with scopes: it is off by default, as google-auth has it, but for a
+key of another universe domain than `googleapis.com`, which has no token
+endpoint, and a subject takes the grant always.
+
+`Pyjo.GCP.RSA` signs RS256 as `Pyjo.AWS.ECDSA` of Pyjo-AWS signs ES256: read
+its section aws login of `../Pyjo-AWS/AGENTS.md` for the package
+`cryptography` of the extra `cryptography` imported with `importlib`, and
+Python otherwise. The padding of PKCS #1 v1.5 is not random, so both backends
+make the same signature, which `t/GCP_RSA.py` compares with the one of
+`cryptography` and `openssl dgst -verify` checks. The signature of Python is
+of the CRT, checked with the public key before it is given, as a fault of the
+CRT would give the primes away, and is not constant-time, of a key on the
+machine that has it. Its parser of DER is the one of `Pyjo.AWS.ECDSA`, with
+lengths of up to four bytes, as a key of 4096 bits needs two.
+
+The key of the tests is in `t/lib/Key.py`, a helper that the harness skips,
+as in Pyjoyment, as its numbers, of which the tests make the PEM: a PEM of a
+private key in the repository is what a scanner of secrets reports. The
+workflow Tests runs without `cryptography`, so its backend is checked with
+`uv run --with cryptography` in development.
+
 ## The Client
 
 `Pyjo.GCP.Client` is the one of Pyjo-AWS: read the section The Client of

@@ -23,7 +23,9 @@ file of credentials of Google Cloud, as the one of
 ``GOOGLE_APPLICATION_CREDENTIALS`` or of
 ``gcloud auth application-default login``, of the provider of its ``type``:
 
-* ``authorized_user``, of :mod:`Pyjo.GCP.Credentials.AuthorizedUser`.
+* ``authorized_user``, of :mod:`Pyjo.GCP.Credentials.AuthorizedUser`,
+* ``service_account``, of :mod:`Pyjo.GCP.Credentials.ServiceAccount`, with
+  the scopes of the provider.
 
 The quota project of ``GOOGLE_CLOUD_QUOTA_PROJECT`` comes over the one of
 the file, and the file of ``gcloud auth application-default login``, which
@@ -44,7 +46,7 @@ import Pyjo.Exception
 import Pyjo.File
 
 from .. import Config, Credentials
-from . import AuthorizedUser, Provider
+from . import AuthorizedUser, Provider, ServiceAccount
 
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -157,6 +159,8 @@ class Pyjo_GCP_Credentials_File(Provider.object):
         kind = info.get('type')
         if kind == 'authorized_user':
             return AuthorizedUser.AuthorizedUser.from_info(info, ua=self.ua, refresh=self.refresh)
+        if kind == 'service_account':
+            return ServiceAccount.ServiceAccount.from_info(info, scopes=self.scopes, ua=self.ua, refresh=self.refresh)
         raise Pyjo.Exception.new(f'Unsupported type of the credentials of Google Cloud {path}: {kind!r}')
 
 

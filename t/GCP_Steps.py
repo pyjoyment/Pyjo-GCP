@@ -7,8 +7,10 @@ from Pyjo.GCP.Steps import Command, Request, Steps
 from Pyjo.Test import *
 from Pyjoyment.Lite import *
 
+import os
 import re
 import sys
+import time
 
 
 # The steps of a coroutine or a generator, blocking and non-blocking, against an application of the test
@@ -91,6 +93,36 @@ with subtest('Commands'):
         is_ok((result['value'][0], result['value'][1].strip()), (0, b'out'), 'program, non-blocking')
         result = wait(Steps(Command.new(['/nonexistent/gcloud']).__await__()).run_p(ua))
         like_ok(str(result['error']), re.compile(r'^Cannot run /nonexistent/gcloud: '), 'cannot run, non-blocking')
+
+with subtest('Environment and timeout of commands'):
+    env = {**os.environ, 'PYJO_GCP_TEST': 'environment'}
+    printenv = Command.new([sys.executable, '-c', 'import os; print(os.environ["PYJO_GCP_TEST"])'], env=env)
+    code, out, _ = Steps(printenv.__await__()).run(ua)
+    is_ok((code, out.strip()), (0, b'environment'), 'environment, blocking')
+
+    sleep = [sys.executable, '-c', 'import time; time.sleep(10)']
+    start = time.monotonic()
+    throws_ok(
+        lambda: Steps(Command.new(sleep, timeout=0.5).__await__()).run(ua),
+        re.compile(r'^Cannot run \S+: no exit in 0\.5 seconds'),
+        'timeout, blocking',
+    )
+    ok(time.monotonic() - start < 5, 'killed at the timeout')
+
+    if sys.platform == 'win32':
+        skip('the reactor watches no pipes on Windows', 4)
+    else:
+        result = wait(Steps(printenv.__await__()).run_p(ua))
+        is_ok((result['value'][0], result['value'][1].strip()), (0, b'environment'), 'environment, non-blocking')
+
+        start = time.monotonic()
+        result = wait(Steps(Command.new(sleep, timeout=0.5).__await__()).run_p(ua))
+        like_ok(str(result['error']), re.compile(r'^Cannot run \S+: no exit in 0\.5 seconds'), 'timeout, non-blocking')
+        ok(time.monotonic() - start < 5, 'killed at the timeout, non-blocking')
+
+        start = time.monotonic()
+        result = wait(Steps(Command.new([sys.executable, '-c', 'pass'], timeout=10).__await__()).run_p(ua))
+        ok(result['value'][0] == 0 and time.monotonic() - start < 5, 'exit before the timeout, without its timer')
 
 with subtest('Generators and coroutines'):
 

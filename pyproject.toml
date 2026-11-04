@@ -11,7 +11,7 @@ license = "Artistic-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Piotr Roszatycki", email = "piotr.roszatycki@gmail.com" }]
 requires-python = ">=3.12"
-dependencies = ["Pyjoyment>=0.2.0"]
+dependencies = ["Pyjoyment>=0.2.1.dev1"]
 keywords = [
   "pyjoyment",
   "gcp",
@@ -36,6 +36,11 @@ docs = ["sphinx>=9.2.0"]
 # of the distribution, which a new Sphinx may not support, as Sphinx 9.2 does not support 3.12
 [tool.uv.dependency-groups]
 docs = { requires-python = ">=3.14" }
+
+# Pyjoyment of Git until its release 0.2.1, of the dependency >=0.2.1.dev1, whose overloads of Pyjo.File.slurp pyright
+# strict takes, and what the next steps need of it, as the binary HMAC of Pyjo.Util and strftime of Pyjo.Date
+[tool.uv.sources]
+Pyjoyment = { git = "https://github.com/pyjoyment/Pyjoyment", branch = "main" }
 
 # Only the package Pyjo.GCP: the package Pyjo is the one of Pyjoyment, whose namespace extend_path keeps open
 [tool.hatch.build.targets.wheel]

@@ -111,7 +111,12 @@ is not released yet would be its Git repository in `[tool.uv.sources]` of
 `pyproject.toml`, until its release, and not a path to the checkout next to
 this one: uv applies the sources of a dependency of Git, so whoever installs
 the distribution from Git would get a subdirectory of this repository that
-does not exist. The tests lay the checkout next to this one over it with
+does not exist. The lowest version is then the one of Git, as `0.2.1.dev1`,
+which PyPI does not have, so that an installation of PyPI fails to resolve it
+rather than to import what the release has not, and the workflow Build
+installs the wheel with the Pyjoyment of `uv.lock`, of `uv export`, as the
+wheel does not name the source. The tests lay the checkout next to this one
+over it with
 `--with-editable`, so that they test what is there:
 
 ```sh

@@ -48,11 +48,13 @@ jobs:
           if grep -E '(^| )Pyjo/__init__\.py' wheel.txt; then exit 1; fi
 
       # The wheel in an environment of its own, outside the checkout, so that
-      # nothing comes from it, with the Pyjoyment of PyPI that it depends on.
+      # nothing comes from it, with the Pyjoyment of uv.lock, as the one of Git
+      # of [tool.uv.sources] before its release, which the wheel does not name.
       - name: Install and import the wheel
         shell: bash
         run: |-
           uv venv --python "$(command -v python)" "$RUNNER_TEMP/venv"
-          uv pip install --python "$RUNNER_TEMP/venv/bin/python" dist/*.whl
+          uv export --frozen --no-dev --no-emit-project --no-hashes -o "$RUNNER_TEMP/requirements.txt"
+          uv pip install --python "$RUNNER_TEMP/venv/bin/python" -r "$RUNNER_TEMP/requirements.txt" dist/*.whl
           cd "$RUNNER_TEMP"
           venv/bin/python -c 'import Pyjo.GCP, Pyjo.URL; print(Pyjo.GCP.__version__)'

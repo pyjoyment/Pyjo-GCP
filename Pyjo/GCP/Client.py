@@ -118,7 +118,8 @@ class Pyjo_GCP_Client(Pyjo.Base.object):
             client.endpoint = 'http://127.0.0.1:4443'
 
         The URL of the endpoint, which comes over the one of :attr:`config`,
-        or ``None``.
+        also a relative one, as an empty one of the server of :attr:`ua`, or
+        ``None``.
         """
 
         emulator = endpoint is None and self.config.emulator_host(service) is not None
@@ -190,7 +191,7 @@ class Pyjo_GCP_Client(Pyjo.Base.object):
         The URL of the endpoint, :attr:`endpoint`, or the one of
         :attr:`config`.
         """
-        return self.endpoint or self.config.endpoint_url(self.service)
+        return self.endpoint if self.endpoint is not None else self.config.endpoint_url(self.service)
 
     def headers(self, credentials: Credentials.object) -> dict[str, str]:
         """::

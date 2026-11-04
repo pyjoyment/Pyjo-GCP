@@ -116,6 +116,42 @@ have in their paths.
 `Steps of GCP await`; read the section The Steps of `../Pyjo-AWS/AGENTS.md`
 for its mechanism. A change of one is made in the other too.
 
+## The Credentials
+
+A provider of `Pyjo.GCP.Credentials.Provider` is the one of Pyjo-AWS: read
+the section The Credentials of `../Pyjo-AWS/AGENTS.md` for `fetch` as a
+coroutine of the steps, `None` of a provider that is not configured, the
+exception of one that is configured, which ends the chain, and the promise
+that a burst of calls shares. The credentials are an access token of OAuth
+2.0, kept until `refresh` seconds before its expiration, 225 as
+`REFRESH_THRESHOLD` of google-auth has it, 3 minutes and 45 seconds, and
+`__repr__` has no token.
+
+`Pyjo.GCP.Credentials.Chain` is the order of `_default.default` without App
+Engine of the first generation: `Pyjo.GCP.Credentials.File` of
+`GOOGLE_APPLICATION_CREDENTIALS`, whose file that does not exist is an error,
+and of `gcloud auth application-default login`, whose file that does not
+exist is not configured, then the metadata server. A file is the provider of
+its `type`, which `provider_of` makes of its JSON object with the user agent
+of the file, so that the provider of the source of an impersonated service
+account is made the same way. The file applies the quota project of the
+environment and the project of gcloud, and the chain the project of the
+environment, both on a copy of the credentials of `copy`, so that a provider
+keeps its own.
+
+The token of an `authorized_user` has the scopes of the login: google-auth
+sends no `scope` with the refresh token of the Application Default
+Credentials, as `with_scopes_if_required` leaves the credentials of a user
+as they are. The token endpoint is `token_uri` of the file, or
+`https://oauth2.googleapis.com/token`, where google-auth always takes the
+latter: gcloud writes no `token_uri`, so the endpoint is the same for its
+files, and a test points its file to an application of its own.
+
+The token endpoints of OAuth 2.0 answer the same way, the token endpoint of
+Google, the STS of Google and the metadata server alike: `access_token` and
+`expires_in`, or `error` and `error_description`, which `parse_token` of
+`Pyjo.GCP.Credentials.Provider` reads for them all.
+
 ## Imports of the Package
 
 The modules of the distribution import the package and each other relatively,

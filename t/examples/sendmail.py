@@ -5,6 +5,7 @@ import Pyjo.UserAgent
 from Pyjo.Test import *
 
 import os
+import smtplib
 import socket
 import subprocess
 import sys
@@ -155,6 +156,74 @@ try:
 
         done = subprocess.run([sys.executable, EXAMPLE, '--help'], capture_output=True, check=False, env=env)
         like_ok(done.stdout.decode(), r'^Usage: sendmail\.py ', 'usage')
+
+    with subtest('SMTP server'):
+        smtp_port, _ = listen()
+        stderr = tmp.child('stderr')
+        with stderr.open('w') as log:
+            daemon = subprocess.Popen(
+                [sys.executable, EXAMPLE, '-bd', '--listen', f'127.0.0.1:{smtp_port}'],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=log,
+            )
+        try:
+            wait_for(daemon, smtp_port)
+            with smtplib.SMTP('127.0.0.1', smtp_port, timeout=10) as smtp:
+                code, extensions = smtp.ehlo()
+                is_ok(code, 250, 'EHLO')
+                is_ok(extensions.decode().split('\n')[1:], ['SIZE 36700160', '8BITMIME', 'PIPELINING'],
+                      'extensions of EHLO')  # fmt: skip
+                message = b'To: alice@example.com\r\nSubject: Hello\r\n\r\nHello,\r\n.\r\n..two dots\r\n'
+                is_ok(smtp.sendmail('app@example.com', ['alice@example.com', 'carol@example.com'], message), {},
+                      'message of SMTP')  # fmt: skip
+                is_ok(
+                    last()['message'],
+                    'From: app@example.com\r\nBcc: carol@example.com\r\nTo: alice@example.com\r\nSubject: Hello\r\n\r\n'
+                    'Hello,\r\n.\r\n..two dots\r\n',
+                    'message with the From of MAIL FROM, the Bcc of RCPT TO, and the dots of the client left out',
+                )
+
+                for text, status in (('Forbidden', 550), ('Invalid', 554), ('Unavailable', 451)):
+                    try:
+                        smtp.sendmail('app@example.com', ['alice@example.com'], f'Subject: {text}\r\n\r\nx\r\n')
+                        fail(f'reply of {text}')
+                    except smtplib.SMTPDataError as e:
+                        is_ok(e.smtp_code, status, f'reply of {text}')
+
+                is_ok(smtp.docmd('DATA')[0], 503, 'DATA without RCPT')
+                is_ok(smtp.docmd('RCPT TO:<alice@example.com>')[0], 503, 'RCPT without MAIL')
+                is_ok(smtp.docmd('MAIL FROM:<app@example.com> SIZE=99999999')[0], 552, 'SIZE over the limit')
+                is_ok(smtp.docmd('MAIL FROM app@example.com')[0], 501, 'syntax of MAIL')
+                is_ok(smtp.docmd('AUTH PLAIN AGFwcABzZWNyZXQ=')[0], 502, 'no AUTH')
+                is_ok(smtp.docmd('STARTTLS')[0], 502, 'no STARTTLS')
+                is_ok(smtp.docmd('VRFY alice')[0], 252, 'VRFY')
+                is_ok(smtp.docmd('NOOP')[0], 250, 'NOOP')
+                is_ok(smtp.docmd('BOGUS')[0], 500, 'unknown command')
+
+            # The commands of PIPELINING, of a message and of the ones after it, which wait for the reply of the Gmail API
+            with (
+                socket.create_connection(('127.0.0.1', smtp_port), timeout=10) as client,
+                client.makefile('rb') as stream,
+            ):
+                stream.readline()
+                client.sendall(b'EHLO test\r\nMAIL FROM:<app@example.com>\r\nRCPT TO:<bob@example.com>\r\nDATA\r\n')
+                replies = [stream.readline() for _ in range(7)]
+                is_ok([reply[:4] for reply in replies[4:]], [b'250 ', b'250 ', b'354 '], 'replies of PIPELINING')
+                client.sendall(b'Subject: Pipelined\r\n\r\nx\r\n.\r\nRSET\r\nNOOP\r\nQUIT\r\n')
+                replies = [stream.readline() for _ in range(4)]
+                like_ok(replies[0].decode(), r'^250 2\.0\.0 OK m\d+\r\n$', 'message sent before the commands after it')
+                is_ok([reply[:4] for reply in replies[1:]], [b'250 ', b'250 ', b'221 '], 'commands after the message')
+                is_ok(stream.read(), b'', 'connection closed after QUIT')
+                like_ok(last()['message'], r'^From: app@example\.com\r\nBcc: bob@example\.com\r\nSubject: Pipelined\r\n',
+                        'message of PIPELINING')  # fmt: skip
+        finally:
+            stop = time.monotonic()
+            daemon.terminate()
+            daemon.wait()
+        is_ok(daemon.returncode, 0, 'server stopped of SIGTERM')
+        ok(time.monotonic() - stop < 5, 'server without connections stopped at once, of the wakeup of the signal')
+        is_ok(stderr.slurp().decode(), '', 'nothing on the standard error of the server')
 finally:
     gmail.terminate()
     gmail.wait()

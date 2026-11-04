@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+/build/
+/dist/
+/docs/_build/
+
+# Virtual environments of uv
+.venv
+.venv-*
+
+# Caches of the tools
+.ruff_cache/
+
+# Secrets, as in the rules of .claude/settings.json
+.env
+.env.*
+.envrc
+.pypirc
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+
+# macOS
+.DS_Store

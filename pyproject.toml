@@ -1,0 +1,93 @@
+[build-system]
+requires = ["hatchling>=1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "Pyjo-GCP"
+version = "0.2.1.dev1"
+description = "Google Cloud for Pyjoyment: Application Default Credentials and clients of the APIs, without an SDK."
+readme = "README.md"
+license = "Artistic-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Piotr Roszatycki", email = "piotr.roszatycki@gmail.com" }]
+requires-python = ">=3.12"
+dependencies = ["Pyjoyment>=0.2.0"]
+keywords = [
+  "pyjoyment",
+  "gcp",
+  "google-cloud",
+  "application-default-credentials",
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3 :: Only",
+]
+
+[project.urls]
+Homepage = "https://github.com/pyjoyment/Pyjo-GCP"
+Documentation = "https://pyjoyment.readthedocs.io/projects/pyjo-gcp/en/stable/"
+
+# Sphinx of docs/, which Read the Docs and the workflow Docs install with uv sync --group docs
+[dependency-groups]
+docs = ["sphinx>=9.2.0"]
+
+# The documentation is built with Python 3.14 of Read the Docs and 3.15 of the workflow Docs, not with the lowest Python
+# of the distribution, which a new Sphinx may not support, as Sphinx 9.2 does not support 3.12
+[tool.uv.dependency-groups]
+docs = { requires-python = ">=3.14" }
+
+# Only the package Pyjo.GCP: the package Pyjo is the one of Pyjoyment, whose namespace extend_path keeps open
+[tool.hatch.build.targets.wheel]
+only-include = ["Pyjo/GCP"]
+
+# The files of the distribution, as in Pyjoyment, and not the files of the tools, as .trunk
+[tool.hatch.build.targets.sdist]
+include = ["/Pyjo", "/t", "/docs", "/.proverc", "/LICENSE", "/README.md"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.format]
+quote-style = "single"
+
+# The rules of Pyjoyment, whose conventions this distribution follows.
+[tool.ruff.lint]
+select = ["B", "E4", "E7", "E9", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Examples of Pyjoyment.Lite import its functions, as `use Mojolicious::Lite` in Perl.
+"{docs,examples}/**" = [
+  # F403 "`from Pyjoyment.Lite import *` used; unable to detect undefined names"
+  "F403",
+  # F405 "`app` may be undefined, or defined from star imports"
+  "F405",
+]
+# Test scripts import all test functions, like `use Test::More` in Perl.
+"t/**" = [
+  # F403 "`from Pyjo.Test import *` used; unable to detect undefined names"
+  "F403",
+  # F405 "`ok` may be undefined, or defined from star imports"
+  "F405",
+]
+
+[tool.ruff.lint.isort]
+# Pyjo modules first, then the standard library, then the others, as in Pyjoyment.
+known-first-party = ["Pyjo", "Pyjoyment"]
+section-order = [
+  "future",
+  "first-party",
+  "local-folder",
+  "standard-library",
+  "third-party",
+]
+lines-between-types = 1
+lines-after-imports = 2
+
+# The environment of uv sync, where Pyjoyment is, for pyright of Trunk too
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "off"
+strict = ["Pyjo/GCP/**"]

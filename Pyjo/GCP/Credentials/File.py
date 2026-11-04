@@ -41,11 +41,10 @@ Classes
 """
 
 import Pyjo.Exception
+import Pyjo.File
 
 from .. import Config, Credentials
 from . import AuthorizedUser, Provider
-
-import os
 
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -87,7 +86,7 @@ class Pyjo_GCP_Credentials_File(Provider.object):
         :mod:`Pyjo.GCP.Config` object by default.
         """
 
-        self.path = os.path.expanduser(path) if path else None
+        self.path = Pyjo.File.path(path).expanduser().to_str() if path else None
         """::
 
             path = provider.path
@@ -123,7 +122,7 @@ class Pyjo_GCP_Credentials_File(Provider.object):
         The credentials of the provider of the file, or ``None`` without
         :attr:`path`, or without the file of an :attr:`optional` one.
         """
-        if not (path := self.path) or self.optional and not os.path.isfile(path):
+        if not (path := self.path) or self.optional and not Pyjo.File.path(path).is_file:
             return None
         credentials = await self.provider_of(self.config.credentials_info(path), path).steps()
         if credentials is None:

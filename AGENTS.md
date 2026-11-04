@@ -273,8 +273,8 @@ google-auth, the base class of the kinds of the source of the subject token,
 which a subclass gets in `subject_token`, a coroutine of the steps, as
 `retrieve_subject_token` of google-auth:
 `Pyjo.GCP.Credentials.IdentityPool` of `identity_pool.py`, of a file or a
-URL, and `Pyjo.GCP.Credentials.Pluggable` of `pluggable.py`, of an
-executable. `provider_of` of `Pyjo.GCP.Credentials.File` tells the kind of
+URL, `Pyjo.GCP.Credentials.Pluggable` of `pluggable.py`, of an executable,
+and `Pyjo.GCP.Credentials.AWS` of `aws.py`, of AWS. `provider_of` of `Pyjo.GCP.Credentials.File` tells the kind of
 `external_account` as `_get_external_account_credentials` of `_default.py`
 does: AWS of its `subject_token_type`, an executable of `executable` of
 `credential_source`, an identity pool otherwise, whose `certificate` of
@@ -308,6 +308,28 @@ output file of an invalid format is an error, as in google-auth, but one of a
 token that is not valid, as an expired one, runs the executable. The
 interactive mode of gcloud, and its revocation, are not supported, as
 google-auth gives them only to gcloud.
+
+The subject token of `Pyjo.GCP.Credentials.AWS` is a request of
+`GetCallerIdentity` of `regional_cred_verification_url`, signed and not
+sent, which the STS of Google sends to AWS: the percent-encoded JSON object
+of its URL, its method and its headers. The credentials of AWS are those of
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`, or of
+the role of the instance metadata of `url` of the file, and the region is the
+one of `AWS_REGION` or `AWS_DEFAULT_REGION`, or of the availability zone of
+`region_url` without its last letter, with the session token of IMDSv2 of
+`imdsv2_session_token_url` when the file has one, as google-auth has them.
+That is all that google-auth reads, so the provider does not need the chain
+of Pyjo-AWS, with its profiles, SSO and roles, and Pyjo-GCP does not depend
+on Pyjo-AWS.
+
+Its signature is `sign`, `RequestSigner` of google-auth, not a copy of
+`Pyjo.AWS.SigV4`: a request with an empty body, of which `host`,
+`x-amz-date` and `x-amz-security-token` are signed, and
+`x-goog-cloud-target-resource` of the audience is added after the signature,
+unsigned, as google-auth does. Its headers are the ones of google-auth for
+the same time, which a check in development compares with google-auth
+itself. The JSON object of the request has `\/` of `Pyjo.JSON` where the one
+of google-auth has `/`, which is the same JSON for the STS of Google.
 
 The project is the one of `get_project_id`, which `_default.py` asks for an
 external account always: Cloud Resource Manager of the number of the project

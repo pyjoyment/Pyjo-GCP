@@ -24,7 +24,8 @@ access token, as :rfc:`8693` has it, and which a subclass gets in
 :meth:`~Pyjo_GCP_Credentials_ExternalAccount.subject_token`:
 
 * :mod:`Pyjo.GCP.Credentials.IdentityPool`, of a file or a URL,
-* :mod:`Pyjo.GCP.Credentials.Pluggable`, of an executable.
+* :mod:`Pyjo.GCP.Credentials.Pluggable`, of an executable,
+* :mod:`Pyjo.GCP.Credentials.AWS`, of AWS.
 
 With ``service_account_impersonation_url``, the token is the one of the
 service account that the federated token impersonates, of

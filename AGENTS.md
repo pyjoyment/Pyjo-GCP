@@ -117,6 +117,14 @@ have in their paths.
 `Steps of GCP await`; read the section The Steps of `../Pyjo-AWS/AGENTS.md`
 for its mechanism. A change of one is made in the other too.
 
+A `Command` has an environment and a timeout, which the executable of an
+external account needs, as `subprocess.run` of google-auth gives them: the
+blocking run passes them to `subprocess.run`, and the non-blocking one gives
+the environment to `Pyjo.IOLoop.ChildProcess` and kills the process with a
+timer of its reactor, which it removes when the process exits first, so that
+the loop does not wait for it. A killed process is an exception of the
+timeout, not its exit code.
+
 ## The Credentials
 
 A provider of `Pyjo.GCP.Credentials.Provider` is the one of Pyjo-AWS: read
@@ -265,7 +273,8 @@ google-auth, the base class of the kinds of the source of the subject token,
 which a subclass gets in `subject_token`, a coroutine of the steps, as
 `retrieve_subject_token` of google-auth:
 `Pyjo.GCP.Credentials.IdentityPool` of `identity_pool.py`, of a file or a
-URL. `provider_of` of `Pyjo.GCP.Credentials.File` tells the kind of
+URL, and `Pyjo.GCP.Credentials.Pluggable` of `pluggable.py`, of an
+executable. `provider_of` of `Pyjo.GCP.Credentials.File` tells the kind of
 `external_account` as `_get_external_account_credentials` of `_default.py`
 does: AWS of its `subject_token_type`, an executable of `executable` of
 `credential_source`, an identity pool otherwise, whose `certificate` of
@@ -287,6 +296,18 @@ the federated token of the scope of IAM, as `with_scopes` of the impersonated
 credentials of google-auth gives it, so that it keeps the federated token
 until its expiration, not the external account itself, which would ask
 itself again.
+
+The executable of `Pyjo.GCP.Credentials.Pluggable` runs only with
+`GOOGLE_EXTERNAL_ACCOUNT_ALLOW_EXECUTABLES=1`, with the command split as
+`shlex.split` does, the environment of the process with the variables
+`GOOGLE_EXTERNAL_ACCOUNT_*` of google-auth, and `timeout_millis` of 5 to 120
+seconds, 30 by default. Its output is the JSON object of version 1 on its
+standard output, or in `output_file` with none, whose token of
+`expiration_time` that has not expired is taken without running it. An
+output file of an invalid format is an error, as in google-auth, but one of a
+token that is not valid, as an expired one, runs the executable. The
+interactive mode of gcloud, and its revocation, are not supported, as
+google-auth gives them only to gcloud.
 
 The project is the one of `get_project_id`, which `_default.py` asks for an
 external account always: Cloud Resource Manager of the number of the project

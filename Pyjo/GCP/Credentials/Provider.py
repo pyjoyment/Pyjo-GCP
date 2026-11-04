@@ -81,7 +81,7 @@ import Pyjo.UserAgent
 
 from .. import Credentials, Steps
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 
@@ -187,16 +187,24 @@ class Pyjo_GCP_Credentials_Provider(Pyjo.Base.object):
         expires_in = self.cached.expires_in()
         return expires_in is None or expires_in > self.refresh
 
-    def run(self, args: Sequence[str], input: bytes = b'') -> Steps.Command:
+    def run(
+        self,
+        args: Sequence[str],
+        input: bytes = b'',
+        *,
+        env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> Steps.Command:
         """::
 
             code, out, err = await provider.run(['gcloud', 'auth', 'print-access-token'])
-            code, out, err = await provider.run(['/opt/bin/credentials'], input=b'admin')
+            code, out, err = await provider.run(['/opt/bin/credentials'], input=b'admin', timeout=30)
 
-        A program for :meth:`fetch` to await, which gives its exit code, its
-        standard output and its standard error.
+        A program for :meth:`fetch` to await, with the environment and the
+        timeout of :class:`~Pyjo.GCP.Steps.Command`, which gives its exit
+        code, its standard output and its standard error.
         """
-        return Steps.Command.new(args, input)
+        return Steps.Command.new(args, input, env=env, timeout=timeout)
 
     def start(self, tx: Pyjo.Transaction.HTTP.object) -> Steps.Request:
         """::

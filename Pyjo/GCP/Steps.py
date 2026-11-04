@@ -54,7 +54,7 @@ import Pyjo.UserAgent
 import builtins
 import subprocess
 
-from collections.abc import Coroutine, Generator, Sequence
+from collections.abc import Coroutine, Generator, Mapping, Sequence
 from typing import Any, Self, cast
 
 
@@ -63,15 +63,26 @@ type Anything = builtins.object
 
 class Command(Pyjo.Base.object):
     """
-    A program to run, with its arguments and what it gets on its standard
-    input. ::
+    A program to run, with its arguments, what it gets on its standard input,
+    its environment, the one of the process by default, and the number of
+    seconds that it may run, without a limit by default. ::
 
         code, out, err = await Command.new(['gcloud', 'auth', 'print-access-token'])
+        code, out, err = await Command.new(['/opt/bin/token'], env={**os.environ, 'AUDIENCE': audience}, timeout=30)
     """
 
-    def __init__(self, args: Sequence[str], input: bytes = b'') -> None:
+    def __init__(
+        self,
+        args: Sequence[str],
+        input: bytes = b'',
+        *,
+        env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> None:
         self.args = list(args)
         self.input = input
+        self.env = dict(env) if env is not None else None
+        self.timeout = timeout
 
     def __await__(self) -> Generator[Self, Any, tuple[int | None, bytes, bytes]]:
         """::
@@ -79,7 +90,8 @@ class Command(Pyjo.Base.object):
             code, out, err = await command
 
         Run the program and give its exit code, its standard output and its
-        standard error.
+        standard error, or an exception of a program that runs longer than
+        its timeout, which is killed.
         """
         return (yield self)
 
@@ -227,6 +239,10 @@ def _error(op: Operation, reason: Anything) -> Exception:
 # What a coroutine awaits that is not an operation, as a Pyjo.Promise or a future of asyncio, which only an event loop
 # knows: the coroutine is closed and the error raised, not thrown into it, where catching the errors of a connection
 # would hide it
+def _timeout(op: Command) -> Pyjo.Exception.object:
+    return Pyjo.Exception.new(f'Cannot run {op.args[0]}: no exit in {op.timeout:g} seconds')
+
+
 def _unexpected(steps: Generator[Operation, Any, Any], op: Anything) -> TypeError | None:
     if isinstance(op, (Request, Command)):
         return None
@@ -237,7 +253,11 @@ def _unexpected(steps: Generator[Operation, Any, Any], op: Anything) -> TypeErro
 def _blocking(op: Operation, ua: Pyjo.UserAgent.object) -> Any:
     if isinstance(op, Command):
         try:
-            done = subprocess.run(op.args, input=op.input, capture_output=True, check=False)
+            done = subprocess.run(
+                op.args, input=op.input, capture_output=True, check=False, env=op.env, timeout=op.timeout
+            )
+        except subprocess.TimeoutExpired as e:
+            raise _timeout(op) from e
         except OSError as e:
             raise _error(op, e) from e
         return done.returncode, done.stdout, done.stderr
@@ -249,9 +269,23 @@ def _blocking(op: Operation, ua: Pyjo.UserAgent.object) -> Any:
 
 def _nonblocking_p(op: Operation, ua: Pyjo.UserAgent.object) -> Pyjo.Promise.object:
     if isinstance(op, Command):
-        promise: Pyjo.Promise.object = Pyjo.IOLoop.ChildProcess.new().run_p(op.args, input=op.input)
+        child = Pyjo.IOLoop.ChildProcess.new()
+        options: dict[str, Any] = {'env': op.env} if op.env is not None else {}
+        promise: Pyjo.Promise.object = child.run_p(op.args, input=op.input, **options)
+        timer: list[str] = []
+        if op.timeout is not None:
+
+            def kill(reactor: Any) -> None:
+                timer.clear()
+                child.kill()
+
+            timer.append(child.reactor.timer(op.timeout, kill))
 
         def result(code: int | None, out: bytes, err: bytes) -> tuple[int | None, bytes, bytes]:
+            if op.timeout is not None and not timer:
+                raise _timeout(op)
+            for id in timer:
+                child.reactor.remove(id)
             return code, bytes(out), bytes(err)
 
         return promise.then(result)

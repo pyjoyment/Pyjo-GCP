@@ -22,6 +22,7 @@
     api/Pyjo_GCP_Credentials_IdentityPool
     api/Pyjo_GCP_Credentials_Impersonated
     api/Pyjo_GCP_Credentials_Metadata
+    api/Pyjo_GCP_Credentials_Pluggable
     api/Pyjo_GCP_Credentials_Provider
     api/Pyjo_GCP_Credentials_ServiceAccount
     api/Pyjo_GCP_Error

@@ -47,9 +47,10 @@ one of Pyjo-AWS: `google/auth/_default.py` for the order and the project,
 The mechanisms of Pyjo-AWS are meant to be taken as they are, and changed only
 where Google Cloud differs:
 
-- `Pyjo.AWS.Steps`, the coroutine of the operations that `run` drives
-  blocking and `run_p` non-blocking, so that a provider of credentials and a
-  call of the client are written once for both modes,
+- `Pyjo.Steps` of Pyjoyment, which was `Pyjo.AWS.Steps`, the coroutine of
+  the operations that `run` drives blocking and `run_p` non-blocking, so that
+  a provider of credentials and a call of the client are written once for
+  both modes,
 - `Pyjo.AWS.Credentials.Provider` and `Pyjo.AWS.Credentials.Chain`: `fetch`
   as a coroutine of the steps, `None` of a provider that is not configured, an
   exception of one that is configured and fails, which ends the chain, and the
@@ -73,8 +74,8 @@ protocol, with the error of `google.rpc.Status`, so the client needs one class
 of a call, `Pyjo.GCP.Call`, not one of a protocol of each kind of API, as
 Pyjo-AWS does.
 
-Pyjo-GCP does not depend on Pyjo-AWS: a module that both need, as the steps,
-is copied, until it has a distribution of its own or a place in Pyjoyment.
+Pyjo-GCP does not depend on Pyjo-AWS: a module that both need is copied,
+until it has a place in Pyjoyment, as the steps have in `Pyjo.Steps`.
 
 ## The Configuration
 
@@ -113,17 +114,17 @@ have in their paths.
 
 ## The Steps
 
-`Pyjo.GCP.Steps` is a copy of `Pyjo.AWS.Steps`, with its error
-`Steps of GCP await`; read the section The Steps of `../Pyjo-AWS/AGENTS.md`
-for its mechanism. A change of one is made in the other too.
+The providers of the credentials and the calls of the client are coroutines
+of `Pyjo.Steps` of Pyjoyment: a `Request`, a `Command` and a `Sleep`, which
+`run` drives blocking and `run_p` non-blocking. It was a copy of
+`Pyjo.AWS.Steps` here, `Pyjo.GCP.Steps`, until it went to Pyjoyment
+(pyjoyment/Pyjoyment#540), so a change of it is made in Pyjoyment, and its
+mechanism is in its documentation and in the section The Steps of
+`../Pyjo-AWS/AGENTS.md`.
 
-A `Command` has an environment and a timeout, which the executable of an
-external account needs, as `subprocess.run` of google-auth gives them: the
-blocking run passes them to `subprocess.run`, and the non-blocking one gives
-the environment to `Pyjo.IOLoop.ChildProcess` and kills the process with a
-timer of its reactor, which it removes when the process exits first, so that
-the loop does not wait for it. A killed process is an exception of the
-timeout, not its exit code.
+The environment and the timeout of a `Command` are what the executable of an
+external account needs, as `subprocess.run` of google-auth gives them, and a
+killed process is an exception of the timeout, not its exit code.
 
 ## The Credentials
 
@@ -403,8 +404,9 @@ it. A bound token is for the calls of mTLS with that certificate, which
 google-auth waits 30 seconds for the certificate of a configuration of
 `GOOGLE_API_CERTIFICATE_CONFIG` that is not there yet, as of an agent that
 starts before its certificate is written, and fails then; `agent_fingerprint`
-fails at once, as the steps have no sleep, and the provider gets the token
-again on the next call.
+fails at once, as a function and not a coroutine of the steps, whose `Sleep`
+would wait without blocking the loop, and the provider gets the token again
+on the next call.
 
 `t/GCP_X509.py` checks the DER, the fingerprint and the URIs with the parser
 of the module `ssl` of Python, and the tests of the agents take a
@@ -556,11 +558,12 @@ gives any service, without credentials.
 ## Imports of the Package
 
 The modules of the distribution import the package and each other relatively,
-`from .. import GCP` and `from . import Steps`, not as `import Pyjo.GCP.Steps`:
+`from .. import GCP` and `from . import Config`, not as `import Pyjo.GCP.Config`:
 pyright takes `Pyjo` for the regular package of Pyjoyment in `.venv`, which
 hides the namespace that `extend_path` keeps open, so it does not find
 `Pyjo.GCP` of the checkout. The tests and the documentation import them as
-`Pyjo.GCP.Steps`, which Python finds through `extend_path`.
+`Pyjo.GCP.Config`, which Python finds through `extend_path`. A module of
+Pyjoyment, as `Pyjo.Steps`, is imported as it is, `import Pyjo.Steps`.
 
 The package and the tests take what Pyjoyment has, as the distribution depends
 on it already and is a dogfood of it: the files of `Pyjo.File`, as `slurp` and

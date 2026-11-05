@@ -37,7 +37,7 @@ the client calls without a token, as the client libraries of Google do. ::
     storage = Pyjo.GCP.Client.new(service='storage')
 
 A provider of credentials calls an API of Google Cloud with
-:meth:`~Pyjo_GCP_Client.steps`, which :mod:`Pyjo.GCP.Steps` runs with its
+:meth:`~Pyjo_GCP_Client.steps`, which :mod:`Pyjo.Steps` runs with its
 own steps, as an impersonated service account with the credentials of its
 source: ::
 
@@ -59,10 +59,11 @@ Classes
 import Pyjo.Base
 import Pyjo.Exception
 import Pyjo.Promise
+import Pyjo.Steps
 import Pyjo.URL
 import Pyjo.UserAgent
 
-from . import Call, Config, Credentials, Steps
+from . import Call, Config, Credentials
 from .Credentials import Provider
 
 from collections.abc import Sequence
@@ -248,16 +249,16 @@ class Pyjo_GCP_Client(Pyjo.Base.object):
             headers['x-goog-user-project'] = quota_project
         return headers
 
-    def steps(self, call: Call.object, credentials: Credentials.object | None = None) -> Steps.object[Any]:
+    def steps(self, call: Call.object, credentials: Credentials.object | None = None) -> Pyjo.Steps.object[Any]:
         """::
 
             result = await client.steps(call)
             result = await client.steps(call, credentials)
 
-        The :mod:`Pyjo.GCP.Steps` of a call, of a provider of credentials,
+        The :mod:`Pyjo.Steps` of a call, of a provider of credentials,
         with credentials, or those of :attr:`credentials` by default.
         """
-        return Steps.Steps(self._steps(call, credentials))
+        return Pyjo.Steps.Steps(self._steps(call, credentials))
 
     async def _steps(self, call: Call.object, credentials: Credentials.object | None) -> Any:
         if not self.anonymous and credentials is None:
@@ -266,7 +267,7 @@ class Pyjo_GCP_Client(Pyjo.Base.object):
         tx = call.build_tx(self.ua, Pyjo.URL.new(self.endpoint_url()))
         for name, value in headers.items():
             tx.req.headers.header(name, value)
-        return call.result(await Steps.Request.new(tx, self.ua))
+        return call.result(await Pyjo.Steps.Request.new(tx, self.ua))
 
 
 def _required(credentials: Credentials.object | None) -> Credentials.object:

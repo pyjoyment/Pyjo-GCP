@@ -47,7 +47,7 @@ what it needs to wait for, so that the same code runs blocking, in
 * the :meth:`~Pyjo_GCP_Credentials_Provider.steps` of another provider give
   its credentials.
 
-:mod:`Pyjo.GCP.Steps` runs the coroutine, without an event loop, so it
+:mod:`Pyjo.Steps` runs the coroutine, without an event loop, so it
 awaits nothing else, not a :mod:`Pyjo.Promise` and not a future of asyncio,
 which is a :exc:`TypeError`. :meth:`~Pyjo_GCP_Credentials_Provider.fetch` may
 be a generator too, which yields the transactions and the programs, and takes the
@@ -67,7 +67,7 @@ of a provider that is configured, which ends the chain.
 See also
 --------
 
-:mod:`Pyjo.GCP.Credentials`, :mod:`Pyjo.GCP.Credentials.Chain`, :mod:`Pyjo.GCP.Steps`.
+:mod:`Pyjo.GCP.Credentials`, :mod:`Pyjo.GCP.Credentials.Chain`, :mod:`Pyjo.Steps`.
 
 Classes
 -------
@@ -76,10 +76,11 @@ Classes
 import Pyjo.Base
 import Pyjo.Exception
 import Pyjo.Promise
+import Pyjo.Steps
 import Pyjo.Transaction.HTTP
 import Pyjo.UserAgent
 
-from .. import Credentials, Steps
+from .. import Credentials
 
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
@@ -194,19 +195,19 @@ class Pyjo_GCP_Credentials_Provider(Pyjo.Base.object):
         *,
         env: Mapping[str, str] | None = None,
         timeout: float | None = None,
-    ) -> Steps.Command:
+    ) -> Pyjo.Steps.Command:
         """::
 
             code, out, err = await provider.run(['gcloud', 'auth', 'print-access-token'])
             code, out, err = await provider.run(['/opt/bin/credentials'], input=b'admin', timeout=30)
 
         A program for :meth:`fetch` to await, with the environment and the
-        timeout of :class:`~Pyjo.GCP.Steps.Command`, which gives its exit
+        timeout of :class:`~Pyjo.Steps.Command`, which gives its exit
         code, its standard output and its standard error.
         """
-        return Steps.Command.new(args, input, env=env, timeout=timeout)
+        return Pyjo.Steps.Command.new(args, input, env=env, timeout=timeout)
 
-    def start(self, tx: Pyjo.Transaction.HTTP.object) -> Steps.Request:
+    def start(self, tx: Pyjo.Transaction.HTTP.object) -> Pyjo.Steps.Request:
         """::
 
             tx = await provider.start(provider.ua.build_tx('POST', url, form=body))
@@ -214,9 +215,9 @@ class Pyjo_GCP_Credentials_Provider(Pyjo.Base.object):
         A transaction for :meth:`fetch` to await, which :attr:`ua` starts, and
         which it gives back with its response.
         """
-        return Steps.Request.new(tx)
+        return Pyjo.Steps.Request.new(tx)
 
-    def steps(self) -> Steps.object[Credentials.object | None]:
+    def steps(self) -> Pyjo.Steps.object[Credentials.object | None]:
         """::
 
             credentials = await provider.steps()
@@ -227,12 +228,12 @@ class Pyjo_GCP_Credentials_Provider(Pyjo.Base.object):
         another, as an impersonated service account with the credentials of its
         source.
         """
-        return Steps.Steps(self._steps())
+        return Pyjo.Steps.Steps(self._steps())
 
     async def _steps(self) -> Credentials.object | None:
         if self.is_fresh():
             return self.cached
-        credentials = await Steps.Steps(self.fetch())
+        credentials = await Pyjo.Steps.Steps(self.fetch())
         self.cached = credentials
         return credentials
 

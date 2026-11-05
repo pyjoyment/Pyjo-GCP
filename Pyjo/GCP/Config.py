@@ -22,7 +22,7 @@ gcloud, as the Application Default Credentials find them: the file of the
 credentials of ``GOOGLE_APPLICATION_CREDENTIALS``, the one of
 ``gcloud auth application-default login``, the properties of the
 configurations of gcloud, the project, the quota project, the universe
-domain and the endpoint of a service.
+domain, the endpoint of a service, and the certificate of the client of mTLS.
 
 The configuration directory is the one of the ``CLOUDSDK_CONFIG``
 environment variable, or ``~/.config/gcloud``, or ``%APPDATA%\\gcloud`` on
@@ -39,6 +39,25 @@ properties, as ``project`` of ``[core]``: ::
 
 The files are read when a method needs them, once, and a file that does not
 exist has no properties.
+
+The certificate of the client is the one of the workload of the
+configuration of the certificate, of ``GOOGLE_API_CERTIFICATE_CONFIG``, as
+gcloud, Cloud Run and GKE write it: ::
+
+    {
+      "cert_configs": {
+        "workload": {
+          "cert_path": "/var/run/secrets/workload-spiffe-credentials/certificates.pem",
+          "key_path": "/var/run/secrets/workload-spiffe-credentials/private_key.pem"
+        }
+      }
+    }
+
+which the client presents with ``GOOGLE_API_USE_CLIENT_CERTIFICATE=true``, or
+without it when ``GOOGLE_API_CERTIFICATE_CONFIG`` has one, to the endpoint of
+mTLS of a service, as ``https://storage.mtls.googleapis.com``, of
+``GOOGLE_API_USE_MTLS_ENDPOINT``, ``auto``, ``always`` or ``never``, as the
+client libraries of Google have them.
 
 See also
 --------
@@ -62,7 +81,7 @@ import configparser
 import os
 import re
 
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 
 ADC_FILE = 'application_default_credentials.json'
@@ -71,6 +90,23 @@ directory."""
 
 UNIVERSE_DOMAIN = 'googleapis.com'
 """The universe domain of Google Cloud, of the endpoints of its APIs."""
+
+CERTIFICATE_CONFIG = '~/.config/gcloud/certificate_config.json'
+"""The file of the configuration of the certificate of the workload, as gcloud writes it, by default."""
+
+CLOUD_RUN_CERT = '/var/run/secrets/workload-spiffe-credentials/certificates.pem'
+"""The certificate of the workload of Cloud Run."""
+
+CLOUD_RUN_KEY = '/var/run/secrets/workload-spiffe-credentials/private_key.pem'
+"""The private key of the workload of Cloud Run."""
+
+# The paths of Cloud Run of the configurations that gcloud wrote before, which google-auth takes for the well-known ones
+_CLOUD_RUN_INCORRECT = (
+    '/var/lib/volumes/certificate/workload-certificates/certificates.pem',
+    '/var/lib/volumes/certificate/workload-certificates/private_key.pem',
+)
+
+type MtlsEndpoint = Literal['auto', 'always', 'never']
 
 
 class Pyjo_GCP_Config(Pyjo.Base.object):
@@ -130,6 +166,7 @@ class Pyjo_GCP_Config(Pyjo.Base.object):
 
         self._active: str | None = None
         self._properties: dict[str, dict[str, dict[str, str]]] = {}
+        self._workloads: dict[str, tuple[str, str]] = {}
 
     def active_configuration(self) -> str:
         """::
@@ -197,11 +234,21 @@ class Pyjo_GCP_Config(Pyjo.Base.object):
 
             url = config.endpoint_url('storage')
 
-        The URL of the endpoint of a service, of :meth:`emulator_host`, or
-        the one of the service in :meth:`universe_domain`, as
-        ``https://storage.googleapis.com``.
+        The URL of the endpoint of a service, of :meth:`emulator_host`, the
+        one of mTLS of :meth:`is_mtls`, as
+        ``https://storage.mtls.googleapis.com``, of ``googleapis.com`` only,
+        or the one of the service in :meth:`universe_domain`, as
+        ``https://storage.googleapis.com``, or a :mod:`Pyjo.Exception` of mTLS
+        in another universe domain.
         """
-        return self.emulator_host(service) or f'https://{service}.{self.universe_domain()}'
+        if (emulator := self.emulator_host(service)) is not None:
+            return emulator
+        universe = self.universe_domain()
+        if not self.is_mtls():
+            return f'https://{service}.{universe}'
+        if universe != UNIVERSE_DOMAIN:
+            raise Pyjo.Exception.new(f'No endpoint of mTLS of Google Cloud in the universe domain {universe}')
+        return f'https://{service}.mtls.{UNIVERSE_DOMAIN}'
 
     def get(self, name: str, configuration: str | None = None) -> str | None:
         """::
@@ -259,6 +306,122 @@ class Pyjo_GCP_Config(Pyjo.Base.object):
         """
         return getenv('GOOGLE_CLOUD_QUOTA_PROJECT') or None
 
+    def certificate_config(self) -> str | None:
+        """::
+
+            path = config.certificate_config()
+
+        The file of the configuration of the certificate of the workload, of
+        the ``GOOGLE_API_CERTIFICATE_CONFIG`` or
+        ``CLOUDSDK_CONTEXT_AWARE_CERTIFICATE_CONFIG_FILE_PATH`` environment
+        variable, or ``~/.config/gcloud/certificate_config.json``, or ``None``
+        of one that does not exist.
+        """
+        location = getenv('GOOGLE_API_CERTIFICATE_CONFIG') or getenv(
+            'CLOUDSDK_CONTEXT_AWARE_CERTIFICATE_CONFIG_FILE_PATH'
+        )
+        path = Pyjo.File.path(location or CERTIFICATE_CONFIG).expanduser()
+        return path.to_str() if path.is_file else None
+
+    def client_certificate(self) -> tuple[str, str] | None:
+        """::
+
+            cert, key = config.client_certificate() or (None, None)
+
+        The files of the certificate and of the private key of the client of
+        mTLS, of :meth:`workload_certificate`, with
+        :meth:`use_client_certificate`, or ``None``.
+        """
+        if not self.use_client_certificate() or (location := self.certificate_config()) is None:
+            return None
+        return self.workload_certificate(location)
+
+    def is_mtls(self) -> bool:
+        """::
+
+            boolean = config.is_mtls()
+
+        Whether the endpoints are the ones of mTLS, of
+        :meth:`use_mtls_endpoint` ``always``, or ``auto`` with a
+        :meth:`client_certificate`.
+        """
+        mode = self.use_mtls_endpoint()
+        return mode == 'always' or mode == 'auto' and self.client_certificate() is not None
+
+    def use_client_certificate(self) -> bool:
+        """::
+
+            boolean = config.use_client_certificate()
+
+        Whether the client presents a certificate of mTLS, of the
+        ``GOOGLE_API_USE_CLIENT_CERTIFICATE`` or
+        ``CLOUDSDK_CONTEXT_AWARE_USE_CLIENT_CERTIFICATE`` environment
+        variable ``true``, or, without them, of the workload of the
+        configuration of ``GOOGLE_API_CERTIFICATE_CONFIG`` or
+        ``CLOUDSDK_CONTEXT_AWARE_CERTIFICATE_CONFIG_FILE_PATH``, as
+        ``check_use_client_cert`` of google-auth has it.
+        """
+        value = getenv('GOOGLE_API_USE_CLIENT_CERTIFICATE') or getenv('CLOUDSDK_CONTEXT_AWARE_USE_CLIENT_CERTIFICATE')
+        if value:
+            return value.lower() == 'true'
+        location = getenv('GOOGLE_API_CERTIFICATE_CONFIG') or getenv(
+            'CLOUDSDK_CONTEXT_AWARE_CERTIFICATE_CONFIG_FILE_PATH'
+        )
+        if not location:
+            return False
+        try:
+            return self.workload_certificate(location) is not None
+        except Pyjo.Exception.object:
+            return False
+
+    def use_mtls_endpoint(self) -> MtlsEndpoint:
+        """::
+
+            mode = config.use_mtls_endpoint()
+
+        Whether the endpoints are the ones of mTLS, of the
+        ``GOOGLE_API_USE_MTLS_ENDPOINT`` environment variable, ``auto`` by
+        default, for a client with a certificate, ``always`` or ``never``, or
+        a :mod:`Pyjo.Exception` of another value.
+        """
+        mode = (getenv('GOOGLE_API_USE_MTLS_ENDPOINT') or 'auto').lower()
+        if mode not in ('auto', 'always', 'never'):
+            raise Pyjo.Exception.new(f'Invalid GOOGLE_API_USE_MTLS_ENDPOINT {mode!r}: not auto, always or never')
+        return mode
+
+    def workload_certificate(self, location: str) -> tuple[str, str] | None:
+        """::
+
+            cert, key = config.workload_certificate(config.certificate_config())
+
+        The files of the certificate and of the private key of
+        ``cert_configs.workload`` of a configuration of the certificate, with
+        the well-known files of Cloud Run for its paths of the configurations
+        of gcloud before, or ``None`` of a configuration that does not exist,
+        or a :mod:`Pyjo.Exception` of an invalid one.
+        """
+        path = Pyjo.File.path(location).expanduser()
+        if (name := path.to_str()) in self._workloads:
+            return self._workloads[name]
+        if not path.is_file:
+            return None
+        try:
+            data: Any = Pyjo.JSON.decode_json(path.slurp() or b'')
+        except ValueError as e:
+            raise _certificate(f'cannot parse {path}: {e}') from None
+        configs = cast(dict[str, Any], data).get('cert_configs') if isinstance(data, dict) else None
+        workload = cast(dict[str, Any], configs).get('workload') if isinstance(configs, dict) else None
+        if not isinstance(workload, dict):
+            raise _certificate(f'no cert_configs.workload of {path}')
+        workload = cast(dict[str, Any], workload)
+        cert, key = workload.get('cert_path'), workload.get('key_path')
+        if not isinstance(cert, str) or not isinstance(key, str):
+            raise _certificate(f'no cert_path or key_path of cert_configs.workload of {path}')
+        if (cert, key) == _CLOUD_RUN_INCORRECT and not Pyjo.File.path(cert).exists and not Pyjo.File.path(key).exists:
+            cert, key = CLOUD_RUN_CERT, CLOUD_RUN_KEY
+        self._workloads[name] = (cert, key)
+        return cert, key
+
     def universe_domain(self) -> str:
         """::
 
@@ -269,6 +432,10 @@ class Pyjo_GCP_Config(Pyjo.Base.object):
         ``googleapis.com``.
         """
         return getenv('GOOGLE_CLOUD_UNIVERSE_DOMAIN') or UNIVERSE_DOMAIN
+
+
+def _certificate(reason: str) -> Pyjo.Exception.object:
+    return Pyjo.Exception.new(f'Invalid configuration of the certificate of Google Cloud: {reason}')
 
 
 # The directory of gcloud of _cloud_sdk.get_config_path of google-auth

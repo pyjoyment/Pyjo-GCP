@@ -79,8 +79,8 @@ it: ::
       }
     }
 
-The tokens bound to the certificate of an agent identity, which need mTLS of
-the calls too, are not supported.
+The token of the certificate of an agent identity is bound to it, of
+:mod:`Pyjo.GCP.X509`, for the calls of mTLS of :mod:`Pyjo.GCP.Client` with it.
 
 See also
 --------
@@ -97,8 +97,9 @@ import Pyjo.File
 import Pyjo.JSON
 import Pyjo.UserAgent
 
-from Pyjo.Util import b64_decode, b64_encode, getenv
+from Pyjo.Util import b64_decode, b64_encode
 
+from .. import X509, Config
 from . import ExternalAccount
 
 import re
@@ -112,20 +113,6 @@ type Format = Literal['text', 'json']
 MTLS = 'urn:ietf:params:oauth:token-type:mtls'
 """The type of the subject token of a certificate of X.509, of mTLS."""
 
-CERTIFICATE_CONFIG = '~/.config/gcloud/certificate_config.json'
-"""The file of the configuration of the certificate of the workload, as gcloud writes it, by default."""
-
-CLOUD_RUN_CERT = '/var/run/secrets/workload-spiffe-credentials/certificates.pem'
-"""The certificate of the workload of Cloud Run."""
-
-CLOUD_RUN_KEY = '/var/run/secrets/workload-spiffe-credentials/private_key.pem'
-"""The private key of the workload of Cloud Run."""
-
-# The paths of Cloud Run of the configurations that gcloud wrote before, which google-auth takes for the well-known ones
-_CLOUD_RUN_INCORRECT = (
-    '/var/lib/volumes/certificate/workload-certificates/certificates.pem',
-    '/var/lib/volumes/certificate/workload-certificates/private_key.pem',
-)
 
 _CERTIFICATE = re.compile(r'-----BEGIN CERTIFICATE-----(.+?)-----END CERTIFICATE-----', re.DOTALL)
 
@@ -306,29 +293,36 @@ class Pyjo_GCP_Credentials_IdentityPool(ExternalAccount.object):
             cert, key = provider.certificate_paths()
 
         The files of the certificate and of the private key of the workload,
-        of ``cert_configs.workload`` of the configuration of the certificate,
-        or a :mod:`Pyjo.Exception` without them.
+        of :meth:`~Pyjo.GCP.Config.Pyjo_GCP_Config.workload_certificate` of
+        the configuration of :attr:`certificate_config_location`, or of
+        :meth:`~Pyjo.GCP.Config.Pyjo_GCP_Config.certificate_config`, or a
+        :mod:`Pyjo.Exception` without them.
         """
-        location = self.certificate_config_location or getenv('GOOGLE_API_CERTIFICATE_CONFIG')
-        location = location or getenv('CLOUDSDK_CONTEXT_AWARE_CERTIFICATE_CONFIG_FILE_PATH') or CERTIFICATE_CONFIG
-        path = Pyjo.File.path(location).expanduser()
-        if not path.is_file:
-            raise _certificate(f'no configuration of the certificate {path}')
-        try:
-            data: Any = Pyjo.JSON.decode_json(path.slurp() or b'')
-        except ValueError as e:
-            raise _certificate(f'cannot parse {path}: {e}') from None
-        configs = cast(dict[str, Any], data).get('cert_configs') if isinstance(data, dict) else None
-        workload = cast(dict[str, Any], configs).get('workload') if isinstance(configs, dict) else None
-        if not isinstance(workload, dict):
-            raise _certificate(f'no cert_configs.workload of {path}')
-        workload = cast(dict[str, Any], workload)
-        cert, key = workload.get('cert_path'), workload.get('key_path')
-        if not isinstance(cert, str) or not isinstance(key, str):
-            raise _certificate(f'no cert_path or key_path of cert_configs.workload of {path}')
-        if (cert, key) == _CLOUD_RUN_INCORRECT and not Pyjo.File.path(cert).exists and not Pyjo.File.path(key).exists:
-            return CLOUD_RUN_CERT, CLOUD_RUN_KEY
-        return cert, key
+        config = Config.new()
+        location = self.certificate_config_location or config.certificate_config()
+        if location is None or (paths := config.workload_certificate(location)) is None:
+            missing = Pyjo.File.path(location or Config.CERTIFICATE_CONFIG).expanduser()
+            raise _certificate(f'no configuration of the certificate {missing}')
+        return paths
+
+    def exchange_options(self) -> dict[str, str]:
+        """::
+
+            options = provider.exchange_options()
+
+        The options of the exchange, with ``bindCertFingerprint`` of the
+        fingerprint of the certificate of an agent identity, of
+        :attr:`certificate`, which binds the token to it, as google-auth has
+        it, unless ``GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES``
+        is ``false``.
+        """
+        options = super().exchange_options()
+        if self.certificate and X509.should_bind():
+            cert, _ = self.certificate_paths()
+            certificate = X509.from_pem(Pyjo.File.path(cert).slurp() or b'')
+            if certificate.is_agent_identity():
+                options['bindCertFingerprint'] = certificate.fingerprint()
+        return options
 
     async def subject_token(self) -> str:
         """::

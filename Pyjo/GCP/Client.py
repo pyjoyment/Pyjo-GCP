@@ -143,6 +143,21 @@ class Pyjo_GCP_Client(Pyjo.Base.object):
         default.
         """
 
+        self.client_certificate = None if emulator else self.config.client_certificate()
+        """::
+
+            cert, key = client.client_certificate or (None, None)
+
+        The files of the certificate and of the private key that the client
+        presents, of mTLS, of
+        :meth:`~Pyjo.GCP.Config.Pyjo_GCP_Config.client_certificate`, which
+        :attr:`ua` gets, unless it has a certificate of its own, or ``None``,
+        also of an emulator.
+        """
+
+        if self.client_certificate is not None and self.ua.cert is None:
+            self.ua.cert, self.ua.key = self.client_certificate
+
         self.quota_project = quota_project
         """::
 
@@ -205,7 +220,8 @@ class Pyjo_GCP_Client(Pyjo.Base.object):
             url = client.endpoint_url()
 
         The URL of the endpoint, :attr:`endpoint`, or the one of
-        :attr:`config`.
+        :attr:`config`, of mTLS too, as
+        ``https://storage.mtls.googleapis.com``.
         """
         return self.endpoint if self.endpoint is not None else self.config.endpoint_url(self.service)
 

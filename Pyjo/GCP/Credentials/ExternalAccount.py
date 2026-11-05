@@ -323,8 +323,8 @@ class Pyjo_GCP_Credentials_ExternalAccount(Provider.object):
             'subject_token': await self.subject_token(),
             'subject_token_type': self.subject_token_type,
         }
-        if self.workforce_pool_user_project and not self.client_id:
-            form['options'] = url_escape(Pyjo.JSON.to_json({'userProject': self.workforce_pool_user_project}))
+        if options := self.exchange_options():
+            form['options'] = url_escape(Pyjo.JSON.to_json(options))
         headers: dict[str, str] = {}
         if self.client_id:
             basic = b64_encode(f'{self.client_id}:{self.client_secret or ""}'.encode(), '')
@@ -358,6 +358,18 @@ class Pyjo_GCP_Credentials_ExternalAccount(Provider.object):
             self._project_asked = True
             self.project = await self._project(credentials)
         return credentials.copy(project=self.project, quota_project=self.quota_project)
+
+    def exchange_options(self) -> dict[str, str]:
+        """::
+
+            options = provider.exchange_options()
+
+        The options of the exchange, ``userProject`` of the workforce pool
+        user project without a client, as google-auth has them.
+        """
+        if self.workforce_pool_user_project and not self.client_id:
+            return {'userProject': self.workforce_pool_user_project}
+        return {}
 
     def impersonated(self) -> Impersonated.object:
         """::

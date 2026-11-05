@@ -30,3 +30,4 @@
     api/Pyjo_GCP_Error
     api/Pyjo_GCP_RSA
     api/Pyjo_GCP_Steps
+    api/Pyjo_GCP_X509

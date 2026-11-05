@@ -25,6 +25,45 @@ know of the project, the quota project and the universe domain. A provider
 of :mod:`Pyjo.GCP.Credentials.Provider` gets them, as
 :mod:`Pyjo.GCP.Credentials.Chain` gets the Application Default Credentials.
 
+The providers are those of the credentials of google-auth, of a file of
+credentials of its ``type``, which :mod:`Pyjo.GCP.Credentials.File` makes
+the provider of, and of the metadata server:
+
+.. list-table::
+    :header-rows: 1
+
+    * - Credentials
+      - ``type`` of the file
+      - Provider
+    * - a user of ``gcloud auth application-default login``
+      - ``authorized_user``
+      - :mod:`Pyjo.GCP.Credentials.AuthorizedUser`
+    * - the key of a service account, with a self-signed JWT or the
+        domain-wide delegation
+      - ``service_account``
+      - :mod:`Pyjo.GCP.Credentials.ServiceAccount`
+    * - an impersonated service account, of the credentials of its source
+      - ``impersonated_service_account``
+      - :mod:`Pyjo.GCP.Credentials.Impersonated`
+    * - Workload Identity Federation of a token of a file or a URL, or of a
+        certificate of X.509
+      - ``external_account``
+      - :mod:`Pyjo.GCP.Credentials.IdentityPool`
+    * - Workload Identity Federation of a token of an executable
+      - ``external_account`` with ``executable``
+      - :mod:`Pyjo.GCP.Credentials.Pluggable`
+    * - Workload Identity Federation of AWS
+      - ``external_account`` of AWS
+      - :mod:`Pyjo.GCP.Credentials.AWS`
+    * - a user of a workforce pool, of
+        ``gcloud auth application-default login --login-config``
+      - ``external_account_authorized_user``
+      - :mod:`Pyjo.GCP.Credentials.ExternalAccountAuthorizedUser`
+    * - the service account of Compute Engine, GKE, Cloud Run and Cloud
+        Functions
+      - none, the metadata server
+      - :mod:`Pyjo.GCP.Credentials.Metadata`
+
 See also
 --------
 

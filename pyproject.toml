@@ -26,7 +26,7 @@ classifiers = [
 
 # The signatures of RS256 of Pyjo.GCP.RSA, for the keys of the service accounts, of cryptography instead of Python
 [project.optional-dependencies]
-cryptography = ["cryptography>=42.0.0"]
+cryptography = ["cryptography>=50.0.2"]
 
 [project.urls]
 Homepage = "https://github.com/pyjoyment/Pyjo-GCP"

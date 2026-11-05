@@ -502,7 +502,7 @@ wheels = [
 
 [[package]]
 name = "pyjo-gcp"
-version = "0.1.0.dev1"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "pyjoyment" },

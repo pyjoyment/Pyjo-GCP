@@ -247,10 +247,13 @@ class Pyjo_GCP_Credentials_IdentityPool(ExternalAccount.object):
         """
 
         # The user agent of mTLS, of the certificate and the key of the configuration, and the authority and the checks
-        # of the one of the argument
+        # of the one of the argument, which keeps no connections, as Metadata: nothing closes it, as a file makes a new
+        # provider for each token, so a connection that it kept would be a socket that is not closed
         if certificate:
             cert, key = self.certificate_paths()
-            self.ua = Pyjo.UserAgent.new(cert=cert, key=key, ca=self.ua.ca, insecure=self.ua.insecure)
+            self.ua = Pyjo.UserAgent.new(
+                cert=cert, key=key, ca=self.ua.ca, insecure=self.ua.insecure, max_connections=0
+            )  # fmt: skip
 
     @classmethod
     def options_of(cls, info: Mapping[str, Any]) -> dict[str, Any]:

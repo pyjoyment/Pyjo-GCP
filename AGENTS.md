@@ -298,7 +298,11 @@ The requests of the provider present the certificate with the key of the
 workload, of mTLS, as `functools.partial(request, cert=...)` of google-auth
 does for the exchange and the impersonation, with a user agent of its own,
 as `Pyjo.UserAgent` has its certificate for all its requests: the one of the
-argument gives it its authority and its checks only. The tokens bound to the
+argument gives it its authority and its checks only. It keeps no connections,
+as the one of `Pyjo.GCP.Credentials.Metadata`: nothing closes it, as
+`Pyjo.GCP.Credentials.File` makes a new provider for each token, so a
+connection that it kept would be a socket of TLS that is not closed, which
+the workflow Tests found as a `ResourceWarning` of Python 3.14. The tokens bound to the
 certificate of an agent identity, `bindCertFingerprint` of the exchange of a
 certificate with the SPIFFE of the agents in its SAN, are not supported, as
 their calls need mTLS too, of `*.mtls.googleapis.com`, which the client has

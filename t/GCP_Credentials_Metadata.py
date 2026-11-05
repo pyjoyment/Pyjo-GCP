@@ -1,12 +1,16 @@
 import Pyjo.File
 import Pyjo.GCP.Credentials.Chain
 import Pyjo.GCP.Credentials.Metadata
+import Pyjo.GCP.X509
 import Pyjo.IOLoop.Server
+import Pyjo.JSON
+import Pyjo.URL
 import Pyjo.UserAgent
 
 from Pyjo.Test import *
 
 import contextlib
+import importlib
 import os
 import re
 import socket
@@ -263,6 +267,36 @@ try:
                 re.compile(r'^Cannot reach the metadata server of Google Cloud: GET http://127\.0\.0\.1:\d+/'),
                 'server of the requests that does not answer',
             )
+
+    # The token bound to the certificate of an agent identity of the configuration of GOOGLE_API_CERTIFICATE_CONFIG, of
+    # its fingerprint, which the query has percent-encoded again, as google-auth sends it
+    with subtest('Agent identity'):
+        sys.path.insert(0, Pyjo.File.curfile().dirname().child('lib').to_str())
+        Key = importlib.import_module('Key')
+        uri = 'spiffe://agents.global.proj-123456.system.id.goog/resources/aiplatform/agent'
+        agent = tmp.child('agent.pem').spew(Key.pem('CERTIFICATE', Key.certificate('agent', [uri])))
+        workload = {'cert_configs': {'workload': {'cert_path': str(agent), 'key_path': '/key.pem'}}}
+        config = tmp.child('certificate_config.json').spew(Pyjo.JSON.to_json(workload))
+        fingerprint = Pyjo.GCP.X509.from_pem(agent.slurp()).fingerprint()
+        with environ(GCE_METADATA_HOST=base, GCE_METADATA_IP=base, GOOGLE_API_CERTIFICATE_CONFIG=str(config)):
+            state()
+            is_ok(Metadata(scopes=['https://www.googleapis.com/auth/pubsub']).credentials().token, 'ya29.default',
+                  'token of an agent identity')  # fmt: skip
+            query = Pyjo.URL.new(f'?{calls()[1]["query"]}').query
+            is_ok(query.param('bindCertificateFingerprint'), fingerprint, 'fingerprint of the certificate of the agent')
+            is_ok(query.param('scopes'), 'https://www.googleapis.com/auth/pubsub', 'scopes with it')
+
+        with environ(GCE_METADATA_HOST=base, GCE_METADATA_IP=base, GOOGLE_API_CERTIFICATE_CONFIG=str(config),
+                     GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES='false'):  # fmt: skip
+            state()
+            Metadata().credentials()
+            is_ok(calls()[1]['query'], '', 'no fingerprint of GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES')
+
+        agent.spew('')
+        with environ(GCE_METADATA_HOST=base, GCE_METADATA_IP=base, GOOGLE_API_CERTIFICATE_CONFIG=str(config)):
+            state()
+            throws_ok(lambda: Metadata().credentials(), re.compile(r'^No certificate of the agent identity'),
+                      'no token without the certificate of the configuration')  # fmt: skip
 
     with subtest('Chain'):
         with environ(GCE_METADATA_HOST=base, GCE_METADATA_IP=base):

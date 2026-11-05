@@ -410,6 +410,22 @@ token. Credentials of another universe domain than the one of the
 configuration are an error, as `_validate_universe_domain` of
 google-api-core has it, but for an `endpoint` of the client.
 
+The mTLS of the client is the one of `configure_mtls_channel` of
+google-auth and of the endpoints of google-api-core: the certificate of the
+workload of the configuration of the certificate, which `Pyjo.GCP.Config`
+reads, as `IdentityPool` does, with `GOOGLE_API_USE_CLIENT_CERTIFICATE=true`,
+or without it when `GOOGLE_API_CERTIFICATE_CONFIG` names a configuration
+with a workload, as `check_use_client_cert` has it, and the endpoint
+`https://<service>.mtls.googleapis.com` of `GOOGLE_API_USE_MTLS_ENDPOINT`,
+`auto` for a client with a certificate, `always` or `never`, in
+`googleapis.com` only. The client gives the certificate to its user agent,
+as `Pyjo.UserAgent` has it for all its requests, unless the user agent has
+one of its own, and not for an emulator. `Config` reads a configuration of
+the certificate once, as `endpoint_url` asks it for each call. The
+certificate of `cert_provider_command` of the context-aware metadata of
+Endpoint Verification is not read: it is a program that prints the key,
+which `Pyjo.UserAgent` takes of a file only.
+
 `Pyjo.GCP.Call` reads the error of the older format too, of Cloud Storage and
 the APIs of the discovery documents, without `status` and with `errors`,
 whose `reason` it takes, or the one of `google.rpc.ErrorInfo` of `details`.

@@ -1,4 +1,6 @@
 import Pyjo.File
+import Pyjo.GCP.Call
+import Pyjo.GCP.Client
 import Pyjo.GCP.Config
 import Pyjo.GCP.Credentials.File
 import Pyjo.GCP.Credentials.IdentityPool
@@ -56,6 +58,11 @@ def iam(c):
 @get('/crm/<number>')
 def crm(c):
     c.render(json={'projectId': 'myproject'})
+
+
+@get('/storage/v1/b')
+def buckets(c):
+    c.render(json={'items': [{'name': 'mybucket'}]})
 
 
 @get('/calls')
@@ -213,23 +220,19 @@ try:
             )
             is_ok(
                 provider_of(info(certificate_config_location=cloud_run)).certificate_paths(),
-                (Pyjo.GCP.Credentials.IdentityPool.CLOUD_RUN_CERT, Pyjo.GCP.Credentials.IdentityPool.CLOUD_RUN_KEY),
+                (Pyjo.GCP.Config.CLOUD_RUN_CERT, Pyjo.GCP.Config.CLOUD_RUN_KEY),
                 'well-known files of Cloud Run of the configuration of gcloud before',
             )
 
         with subtest('Errors'):
             errors = [
-                (info(certificate_config_location=str(tmp.child('missing.json'))), r'no configuration of the certificate \S+missing\.json'),
-                (info(certificate_config_location=str(tmp.child('invalid.json').spew('{'))), r'cannot parse \S+invalid\.json'),
-                (info(certificate_config_location=str(tmp.child('empty.json').spew('{}'))), r'no cert_configs\.workload of \S+empty\.json'),
-                (info(certificate_config_location=config('no-key.json', key_path=None)), r'no cert_path or key_path'),
+                (info(certificate_config_location=str(tmp.child('missing.json'))), r'^Invalid certificate of an external account: no configuration of the certificate \S+missing\.json'),
+                (info(certificate_config_location=str(tmp.child('invalid.json').spew('{'))), r'^Invalid configuration of the certificate of Google Cloud: cannot parse \S+invalid\.json'),
+                (info(certificate_config_location=str(tmp.child('empty.json').spew('{}'))), r'^Invalid configuration of the certificate of Google Cloud: no cert_configs\.workload of \S+empty\.json'),
+                (info(certificate_config_location=config('no-key.json', key_path=None)), r'^Invalid configuration of the certificate of Google Cloud: no cert_path or key_path'),
             ]  # fmt: skip
             for fields, error in errors:
-                throws_ok(
-                    lambda fields=fields: provider_of(fields),
-                    re.compile(r'^Invalid certificate of an external account: ' + error),
-                    error,
-                )
+                throws_ok(lambda fields=fields: provider_of(fields), re.compile(error), error.lstrip('^'))
 
             throws_ok(
                 lambda: provider_of(
@@ -253,6 +256,37 @@ try:
                 re.compile(r'^Invalid credentials of an external account: one of certificate_config_location and'),
                 'none of the location and the default of the configuration',
             )
+
+    # The calls of a client with the certificate of the workload, of GOOGLE_API_USE_CLIENT_CERTIFICATE or of the
+    # configuration of GOOGLE_API_CERTIFICATE_CONFIG, to the same server, which takes them with it only
+    with subtest('Client of mTLS'):
+        call = Pyjo.GCP.Call.new('GET', '/storage/v1/b')
+        with environ(GOOGLE_API_CERTIFICATE_CONFIG=config('client.json')):
+            client = Pyjo.GCP.Client.new(service='storage', endpoint=base, anonymous=True,
+                                         ua=Pyjo.UserAgent.new(ca=CA, max_connections=0))  # fmt: skip
+            is_ok(
+                client.client_certificate,
+                (CERT, KEY),
+                'certificate of the configuration of GOOGLE_API_CERTIFICATE_CONFIG',
+            )
+            is_ok((client.ua.cert, client.ua.key), (CERT, KEY), 'certificate of the user agent')
+            is_ok(client.call(call)['items'][0]['name'], 'mybucket', 'call over mTLS')
+            result = wait(client.call_p(call))
+            is_ok(result['value']['items'][0]['name'], 'mybucket', 'call over mTLS, non-blocking')
+            is_ok(Pyjo.GCP.Client.new(service='storage').endpoint_url(), 'https://storage.mtls.googleapis.com',
+                  'endpoint of mTLS')  # fmt: skip
+
+        with environ(GOOGLE_API_CERTIFICATE_CONFIG=config('client.json'), GOOGLE_API_USE_CLIENT_CERTIFICATE='false'):
+            client = Pyjo.GCP.Client.new(service='storage', endpoint=base, anonymous=True,
+                                         ua=Pyjo.UserAgent.new(ca=CA, max_connections=0))  # fmt: skip
+            is_ok(
+                (client.client_certificate, client.ua.cert),
+                (None, None),
+                'no certificate of GOOGLE_API_USE_CLIENT_CERTIFICATE',
+            )
+            throws_ok(lambda: client.call(call), re.compile(r''), 'no call of the server without the certificate')
+            is_ok(Pyjo.GCP.Client.new(service='storage').endpoint_url(), 'https://storage.googleapis.com',
+                  'endpoint without mTLS')  # fmt: skip
 finally:
     server.terminate()
     server.wait()

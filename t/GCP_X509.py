@@ -1,8 +1,10 @@
 import Pyjo.File
 import Pyjo.GCP.Config
 import Pyjo.GCP.X509
+import Pyjo.IOLoop
 import Pyjo.IOLoop.TLS
 import Pyjo.JSON
+import Pyjo.UserAgent
 
 from Pyjo.GCP.X509 import Certificate
 from Pyjo.Test import *
@@ -39,6 +41,12 @@ def config(name, cert):
     path = tmp.child(name)
     path.spew(Pyjo.JSON.to_json({'cert_configs': {'workload': {'cert_path': str(cert), 'key_path': '/key.pem'}}}))
     return str(path)
+
+
+def wait(promise):
+    result = {}
+    promise.then(lambda value: result.update(value=value), lambda reason: result.update(error=reason)).wait()
+    return result
 
 
 @contextlib.contextmanager
@@ -114,5 +122,46 @@ with subtest('Fingerprint of an agent identity'):
                 re.compile(r'^No certificate of the agent identity of GOOGLE_API_CERTIFICATE_CONFIG: the binding'),
                 f'certificate of {name} not there',
             )
+
+# The steps that wait for the certificate of an agent that is not there yet, as google-auth does, with a sleep of each
+# interval, of which a certificate that is written in the meantime is found
+with subtest('Steps of the fingerprint of an agent identity'):
+    ua = Pyjo.UserAgent.new()
+    fingerprint = Certificate.from_pem(AGENT.slurp()).fingerprint()
+
+    with environ():
+        is_ok(Pyjo.GCP.X509.agent_fingerprint_steps().run(ua), None, 'no configuration of the certificate')
+
+    with environ(GOOGLE_API_CERTIFICATE_CONFIG=config('agent.json', AGENT)):
+        is_ok(Pyjo.GCP.X509.agent_fingerprint_steps(intervals=[0.01]).run(ua), fingerprint, 'blocking')
+        is_ok(wait(Pyjo.GCP.X509.agent_fingerprint_steps(intervals=[0.01]).run_p(ua)), {'value': fingerprint},
+              'non-blocking')  # fmt: skip
+
+    late = tmp.child('late.pem')
+    with environ(GOOGLE_API_CERTIFICATE_CONFIG=config('late.json', late)):
+        throws_ok(
+            lambda: Pyjo.GCP.X509.agent_fingerprint_steps(intervals=[0.01] * 3).run(ua),
+            re.compile(r'^No certificate of the agent identity of GOOGLE_API_CERTIFICATE_CONFIG in 0\.03 seconds'),
+            'no certificate after the intervals, blocking',
+        )
+        result = wait(Pyjo.GCP.X509.agent_fingerprint_steps(intervals=[0.01] * 3).run_p(ua))
+        like_ok(str(result.get('error')), re.compile(r'^No certificate of the agent identity'),
+                'no certificate after the intervals, non-blocking')  # fmt: skip
+
+        saved = Pyjo.GCP.X509.POLLING_INTERVALS
+        try:
+            Pyjo.GCP.X509.POLLING_INTERVALS = [0.01, 0.01]
+            throws_ok(lambda: Pyjo.GCP.X509.agent_fingerprint_steps().run(ua), re.compile(r' in 0\.02 seconds: '),
+                      'intervals of POLLING_INTERVALS')  # fmt: skip
+        finally:
+            Pyjo.GCP.X509.POLLING_INTERVALS = saved
+
+        # Written while the steps wait, which the loop of run_p runs, as a timer of the reactor sleeps
+        Pyjo.IOLoop.timer(0.1, lambda loop: late.spew(AGENT.slurp()))
+        is_ok(wait(Pyjo.GCP.X509.agent_fingerprint_steps(intervals=[0.02] * 100).run_p(ua)), {'value': fingerprint},
+              'certificate written while the steps wait')  # fmt: skip
+
+    ok(len(Pyjo.GCP.X509.POLLING_INTERVALS) == 100 and sum(Pyjo.GCP.X509.POLLING_INTERVALS) == 30,
+       'intervals of 30 seconds, as google-auth has them')  # fmt: skip
 
 done_testing()

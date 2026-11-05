@@ -292,11 +292,18 @@ try:
             Metadata().credentials()
             is_ok(calls()[1]['query'], '', 'no fingerprint of GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES')
 
+        # The steps wait for the certificate, for 30 seconds of POLLING_INTERVALS, of which the test takes less
         agent.spew('')
+        saved = Pyjo.GCP.X509.POLLING_INTERVALS
         with environ(GCE_METADATA_HOST=base, GCE_METADATA_IP=base, GOOGLE_API_CERTIFICATE_CONFIG=str(config)):
-            state()
-            throws_ok(lambda: Metadata().credentials(), re.compile(r'^No certificate of the agent identity'),
-                      'no token without the certificate of the configuration')  # fmt: skip
+            try:
+                Pyjo.GCP.X509.POLLING_INTERVALS = [0.01] * 3
+                state()
+                throws_ok(lambda: Metadata().credentials(),
+                          re.compile(r'^No certificate of the agent identity of GOOGLE_API_CERTIFICATE_CONFIG in 0\.03'),
+                          'no token without the certificate of the configuration, after the intervals')  # fmt: skip
+            finally:
+                Pyjo.GCP.X509.POLLING_INTERVALS = saved
 
     with subtest('Chain'):
         with environ(GCE_METADATA_HOST=base, GCE_METADATA_IP=base):

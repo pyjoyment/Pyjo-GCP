@@ -14,6 +14,9 @@ Pyjo.GCP.X509 - Certificates of X.509 of the workloads
 
     fingerprint = Pyjo.GCP.X509.agent_fingerprint()
 
+    # Or the steps that wait for the certificate, as a provider of credentials
+    fingerprint = await Pyjo.GCP.X509.agent_fingerprint_steps()
+
 :mod:`Pyjo.GCP.X509` is a certificate of X.509 of a workload, of the
 configuration of the certificate of :mod:`Pyjo.GCP.Config`, as much of it as
 the tokens of Google Cloud that are bound to it need: its DER, the
@@ -26,7 +29,9 @@ A token of the metadata server and of an external account of a certificate
 is bound to the certificate of an agent identity, with its fingerprint,
 unless ``GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES`` is
 ``false``, so that the token is of the calls of mTLS with that certificate
-only.
+only. The steps of :func:`agent_fingerprint_steps` wait for a certificate
+that is not there yet, as of an agent that starts before its certificate is
+written, for 30 seconds, as google-auth does.
 
 See also
 --------
@@ -42,6 +47,7 @@ import Pyjo.Base
 import Pyjo.Exception
 import Pyjo.File
 import Pyjo.JSON
+import Pyjo.Steps
 
 from Pyjo.Util import b64_decode, b64_encode, getenv, sha256_bytes, url_escape
 
@@ -49,6 +55,7 @@ from . import Config
 
 import re
 
+from collections.abc import Sequence
 from typing import Any, Self, cast
 
 
@@ -57,6 +64,11 @@ AGENT_TRUST_DOMAINS = (
     re.compile(r'^agents\.global\.proj-\d+\.system\.id\.goog$'),
 )
 """The trust domains of SPIFFE of the agent identities of Google Cloud."""
+
+POLLING_INTERVALS: Sequence[float] = (0.1,) * 50 + (0.5,) * 50
+"""The seconds of :func:`agent_fingerprint_steps` between the attempts to
+find the certificate of an agent identity, 30 in all, as ``_POLLING_INTERVALS``
+of google-auth has them."""
 
 # The object identifier of subjectAltName of RFC 5280, as DER has it
 _SUBJECT_ALT_NAME = bytes.fromhex('551d11')
@@ -160,30 +172,40 @@ def agent_fingerprint(config: Config.object | None = None) -> str | None:
     ``GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES=false``, as
     ``get_and_parse_agent_identity_certificate`` of google-auth has it, or a
     :mod:`Pyjo.Exception` of a configuration whose certificate is not there
-    yet, which google-auth waits for for 30 seconds.
+    yet, at once, which :func:`agent_fingerprint_steps` waits for.
     """
-    if not should_bind():
+    if not should_bind() or not getenv('GOOGLE_API_CERTIFICATE_CONFIG'):
         return None
-    if not (location := getenv('GOOGLE_API_CERTIFICATE_CONFIG')):
+    if (path := _agent_certificate_path()) is None:
+        raise _no_agent_certificate()
+    return _agent_fingerprint_of(path)
+
+
+def agent_fingerprint_steps(
+    config: Config.object | None = None, intervals: Sequence[float] | None = None
+) -> Pyjo.Steps.object[str | None]:
+    """::
+
+        fingerprint = await Pyjo.GCP.X509.agent_fingerprint_steps()
+        fingerprint = Pyjo.GCP.X509.agent_fingerprint_steps().run(ua)
+
+    Same as :func:`agent_fingerprint`, but the :mod:`Pyjo.Steps` that wait
+    for a certificate that is not there yet, with a sleep of each of the
+    intervals, :data:`POLLING_INTERVALS` by default, as
+    ``get_agent_identity_certificate_path`` of google-auth does, and raise
+    the :mod:`Pyjo.Exception` after them.
+    """
+    return Pyjo.Steps.Steps(_agent_fingerprint_steps(POLLING_INTERVALS if intervals is None else intervals))
+
+
+async def _agent_fingerprint_steps(intervals: Sequence[float]) -> str | None:
+    if not should_bind() or not getenv('GOOGLE_API_CERTIFICATE_CONFIG'):
         return None
-    path = None
-    try:
-        data: Any = Pyjo.JSON.decode_json(Pyjo.File.path(location).slurp() or b'')
-        configs = cast(dict[str, Any], data).get('cert_configs') if isinstance(data, dict) else None
-        workload = cast(dict[str, Any], configs).get('workload') if isinstance(configs, dict) else None
-        cert = cast(dict[str, Any], workload).get('cert_path') if isinstance(workload, dict) else None
-        path = cert if isinstance(cert, str) and _is_ready(cert) else None
-    except (OSError, ValueError):
-        pass
-    if path is None and _is_ready(Config.CLOUD_RUN_CERT):
-        path = Config.CLOUD_RUN_CERT
-    if path is None:
-        raise Pyjo.Exception.new(
-            'No certificate of the agent identity of GOOGLE_API_CERTIFICATE_CONFIG: the binding of the token fails, which'
-            ' GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES=false turns off'
-        )
-    certificate = Certificate.from_pem(Pyjo.File.path(path).slurp() or b'')
-    return certificate.fingerprint() if certificate.is_agent_identity() else None
+    for interval in intervals:
+        if (path := _agent_certificate_path()) is not None:
+            return _agent_fingerprint_of(path)
+        await Pyjo.Steps.Sleep.new(interval)
+    raise _no_agent_certificate(sum(intervals))
 
 
 def should_bind() -> bool:
@@ -195,6 +217,35 @@ def should_bind() -> bool:
     ``GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES`` is ``false``.
     """
     return (getenv('GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES') or 'true').lower() != 'false'
+
+
+# The certificate of the configuration of GOOGLE_API_CERTIFICATE_CONFIG, or the well-known one of Cloud Run, which is
+# ready when it is not empty, as a file that is being written may be
+def _agent_certificate_path() -> str | None:
+    try:
+        location = getenv('GOOGLE_API_CERTIFICATE_CONFIG') or ''
+        data: Any = Pyjo.JSON.decode_json(Pyjo.File.path(location).slurp() or b'')
+        configs = cast(dict[str, Any], data).get('cert_configs') if isinstance(data, dict) else None
+        workload = cast(dict[str, Any], configs).get('workload') if isinstance(configs, dict) else None
+        cert = cast(dict[str, Any], workload).get('cert_path') if isinstance(workload, dict) else None
+        if isinstance(cert, str) and _is_ready(cert):
+            return cert
+    except (OSError, ValueError):
+        pass
+    return Config.CLOUD_RUN_CERT if _is_ready(Config.CLOUD_RUN_CERT) else None
+
+
+def _agent_fingerprint_of(path: str) -> str | None:
+    certificate = Certificate.from_pem(Pyjo.File.path(path).slurp() or b'')
+    return certificate.fingerprint() if certificate.is_agent_identity() else None
+
+
+def _no_agent_certificate(seconds: float | None = None) -> Pyjo.Exception.object:
+    waited = f' in {seconds:g} seconds' if seconds else ''
+    return Pyjo.Exception.new(
+        f'No certificate of the agent identity of GOOGLE_API_CERTIFICATE_CONFIG{waited}: the binding of the token fails,'
+        ' which GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES=false turns off'
+    )
 
 
 def _is_ready(path: str) -> bool:

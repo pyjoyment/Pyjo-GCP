@@ -31,9 +31,9 @@ file of credentials of Google Cloud, as the one of
   and its source of the provider of the type of ``source_credentials``, with
   the scope of IAM,
 * ``external_account``, of :mod:`Pyjo.GCP.Credentials.IdentityPool`, of a
-  file or a URL, :mod:`Pyjo.GCP.Credentials.Pluggable`, of an executable,
-  or :mod:`Pyjo.GCP.Credentials.AWS`, of AWS, with the scopes of the
-  provider,
+  file, a URL or a certificate of X.509, of
+  :mod:`Pyjo.GCP.Credentials.Pluggable`, of an executable, or of
+  :mod:`Pyjo.GCP.Credentials.AWS`, of AWS, with the scopes of the provider,
 * ``external_account_authorized_user``, of
   :mod:`Pyjo.GCP.Credentials.ExternalAccountAuthorizedUser`.
 

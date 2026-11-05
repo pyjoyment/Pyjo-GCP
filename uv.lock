@@ -523,7 +523,7 @@ docs = ">=3.14"
 
 [package.metadata]
 requires-dist = [
-    { name = "cryptography", marker = "extra == 'cryptography'", specifier = ">=42.0.0" },
+    { name = "cryptography", marker = "extra == 'cryptography'", specifier = ">=50.0.2" },
     { name = "pyjoyment", specifier = ">=0.3.0" },
 ]
 provides-extras = ["cryptography"]

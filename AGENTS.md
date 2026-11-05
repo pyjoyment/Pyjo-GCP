@@ -302,12 +302,7 @@ argument gives it its authority and its checks only. It keeps no connections,
 as the one of `Pyjo.GCP.Credentials.Metadata`: nothing closes it, as
 `Pyjo.GCP.Credentials.File` makes a new provider for each token, so a
 connection that it kept would be a socket of TLS that is not closed, which
-the workflow Tests found as a `ResourceWarning` of Python 3.14. The tokens bound to the
-certificate of an agent identity, `bindCertFingerprint` of the exchange of a
-certificate with the SPIFFE of the agents in its SAN, are not supported, as
-their calls need mTLS too, of `*.mtls.googleapis.com`, which the client has
-not.
-
+the workflow Tests found as a `ResourceWarning` of Python 3.14.
 `t/GCP_Credentials_X509.py` serves the STS over TLS in a process of its own,
 with the certificates of the package of Pyjoyment, `Pyjo/IOLoop/certs`:
 `server.crt` of the server, which takes the requests with `client.crt` only,
@@ -381,6 +376,41 @@ workforce pool, with the basic authentication of its client, to `token_url`,
 without scopes. The token of the file, with `expiry`, is the cached one of
 the provider, as google-auth takes it as valid, and a file without the
 fields of the refresh has that one only.
+
+## The Agent Identities
+
+`Pyjo.GCP.X509` is `_agent_identity_utils.py` of google-auth without the
+package `cryptography`: the DER of a certificate of PEM, the fingerprint of
+SHA-256 of its DER in Base64 without its padding, percent-encoded but its
+slashes, as `quote` of google-auth makes it, and the URIs of its
+subjectAltName, of a reader of DER of its own, as the one of `Pyjo.GCP.RSA`,
+which walks the certificate to its extensions only. A certificate is of an
+agent identity of a URI of SPIFFE of the trust domains
+`agents.global.org-<n>.system.id.goog` and `agents.global.proj-<n>.system.id.goog`.
+
+A token of such a certificate is bound to it, unless
+`GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES` is `false`: the one
+of the metadata server with `bindCertificateFingerprint` of the certificate
+of the workload of `GOOGLE_API_CERTIFICATE_CONFIG`, or of the well-known one
+of Cloud Run, and the one of the exchange of an external account of a
+certificate with `bindCertFingerprint` of `options`, of `exchange_options` of
+`Pyjo.GCP.Credentials.IdentityPool`, of its own certificate. The fingerprint
+goes in the query or the form percent-encoded once more, as google-auth sends
+it. A bound token is for the calls of mTLS with that certificate, which
+`Pyjo.GCP.Client` makes of the same configuration, as
+`GOOGLE_API_CERTIFICATE_CONFIG` turns its certificate on.
+
+google-auth waits 30 seconds for the certificate of a configuration of
+`GOOGLE_API_CERTIFICATE_CONFIG` that is not there yet, as of an agent that
+starts before its certificate is written, and fails then; `agent_fingerprint`
+fails at once, as the steps have no sleep, and the provider gets the token
+again on the next call.
+
+`t/GCP_X509.py` checks the DER, the fingerprint and the URIs with the parser
+of the module `ssl` of Python, and the tests of the agents take a
+certificate of `Key.certificate` of `t/lib/Key.py`, made of the key of the
+tests when they run, as Pyjoyment has no certificate of an agent: a server of
+TLS of a test takes it as an authority of its own too.
 
 ## The Client
 

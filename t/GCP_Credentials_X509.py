@@ -4,15 +4,18 @@ import Pyjo.GCP.Client
 import Pyjo.GCP.Config
 import Pyjo.GCP.Credentials.File
 import Pyjo.GCP.Credentials.IdentityPool
+import Pyjo.GCP.X509
 import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.TLS
 import Pyjo.JSON
 import Pyjo.UserAgent
+import Pyjo.Util
 
 from Pyjo.GCP.Credentials.IdentityPool import IdentityPool
 from Pyjo.Test import *
 
 import contextlib
+import importlib
 import os
 import re
 import socket
@@ -32,6 +35,15 @@ CERTS = Pyjo.File.path(Pyjo.IOLoop.TLS.CERT).dirname()
 CA, CERT, KEY = (CERTS.child(name).to_str() for name in ('ca.crt', 'client.crt', 'client.key'))
 CHAIN = tmp.child('chain.pem').spew(Pyjo.File.path(CERT).slurp() + Pyjo.File.path(CA).slurp())
 WRONG_CHAIN = tmp.child('wrong-chain.pem').spew(Pyjo.File.path(CA).slurp() + Pyjo.File.path(CERT).slurp())
+
+# The certificate of an agent identity, of the SPIFFE ID of an agent, which Pyjoyment has not, made of the key of the
+# tests when the test runs, which the server takes as an authority of its own too
+sys.path.insert(0, Pyjo.File.curfile().dirname().child('lib').to_str())
+Key = importlib.import_module('Key')
+AGENT_URI = 'spiffe://agents.global.proj-123456.system.id.goog/resources/aiplatform/agent'
+AGENT = tmp.child('agent.pem').spew(Key.pem('CERTIFICATE', Key.certificate('agent', [AGENT_URI])))
+AGENT_KEY = tmp.child('agent.key').spew(Key.pem('PRIVATE KEY', Key.PKCS8))
+AUTHORITIES = tmp.child('authorities.pem').spew(Pyjo.File.path(CA).slurp() + AGENT.slurp())
 
 AUDIENCE = '//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/x509'
 TARGET = 'reader@myproject.iam.gserviceaccount.com'
@@ -81,7 +93,7 @@ def listen():
 
 port, base = listen()
 server = subprocess.Popen(
-    [sys.executable, str(SERVER), 'daemon', '-l', f'{base}?ca={CA}'],
+    [sys.executable, str(SERVER), 'daemon', '-l', f'{base}?ca={AUTHORITIES}'],
     stdout=subprocess.DEVNULL,
     stderr=subprocess.DEVNULL,
 )
@@ -259,6 +271,29 @@ try:
 
     # The calls of a client with the certificate of the workload, of GOOGLE_API_USE_CLIENT_CERTIFICATE or of the
     # configuration of GOOGLE_API_CERTIFICATE_CONFIG, to the same server, which takes them with it only
+    # The token of the exchange bound to the certificate of the agent identity of the workload, of the options of
+    # bindCertFingerprint of its fingerprint, as google-auth has them
+    with subtest('Agent identity'):
+        with environ():
+            agent = config('agent.json', cert_path=str(AGENT), key_path=str(AGENT_KEY))
+            is_ok(
+                provider_of(info(certificate_config_location=agent)).credentials().token,
+                'ya29.x509',
+                'token of the agent',
+            )
+            options = Pyjo.JSON.from_json(Pyjo.Util.url_unescape(calls()[-1]['form']['options']))
+            is_ok(options, {'bindCertFingerprint': Pyjo.GCP.X509.from_pem(AGENT.slurp()).fingerprint()},
+                  'fingerprint of the certificate of the agent')  # fmt: skip
+            provider_of(info()).credentials()
+            ok('options' not in calls()[-1]['form'], 'no fingerprint of a workload that is not an agent')
+
+        with environ(GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES='false'):
+            provider_of(info(certificate_config_location=agent)).credentials()
+            ok(
+                'options' not in calls()[-1]['form'],
+                'no fingerprint of GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES',
+            )
+
     with subtest('Client of mTLS'):
         call = Pyjo.GCP.Call.new('GET', '/storage/v1/b')
         with environ(GOOGLE_API_CERTIFICATE_CONFIG=config('client.json')):

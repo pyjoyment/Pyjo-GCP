@@ -79,8 +79,8 @@ it: ::
       }
     }
 
-The tokens bound to the certificate of an agent identity, which need mTLS of
-the calls too, are not supported.
+The token of the certificate of an agent identity is bound to it, of
+:mod:`Pyjo.GCP.X509`, for the calls of mTLS of :mod:`Pyjo.GCP.Client` with it.
 
 See also
 --------
@@ -99,7 +99,7 @@ import Pyjo.UserAgent
 
 from Pyjo.Util import b64_decode, b64_encode
 
-from .. import Config
+from .. import X509, Config
 from . import ExternalAccount
 
 import re
@@ -304,6 +304,25 @@ class Pyjo_GCP_Credentials_IdentityPool(ExternalAccount.object):
             missing = Pyjo.File.path(location or Config.CERTIFICATE_CONFIG).expanduser()
             raise _certificate(f'no configuration of the certificate {missing}')
         return paths
+
+    def exchange_options(self) -> dict[str, str]:
+        """::
+
+            options = provider.exchange_options()
+
+        The options of the exchange, with ``bindCertFingerprint`` of the
+        fingerprint of the certificate of an agent identity, of
+        :attr:`certificate`, which binds the token to it, as google-auth has
+        it, unless ``GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES``
+        is ``false``.
+        """
+        options = super().exchange_options()
+        if self.certificate and X509.should_bind():
+            cert, _ = self.certificate_paths()
+            certificate = X509.from_pem(Pyjo.File.path(cert).slurp() or b'')
+            if certificate.is_agent_identity():
+                options['bindCertFingerprint'] = certificate.fingerprint()
+        return options
 
     async def subject_token(self) -> str:
         """::

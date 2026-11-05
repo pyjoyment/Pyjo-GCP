@@ -57,7 +57,7 @@ import Pyjo.UserAgent
 
 from Pyjo.Util import getenv, url_escape
 
-from .. import Credentials
+from .. import X509, Credentials
 from . import Provider
 
 import os
@@ -239,8 +239,10 @@ class Pyjo_GCP_Credentials_Metadata(Provider.object):
         if not self.detected:
             return None
         account = url_escape(self.service_account, r'^A-Za-z0-9\-._~@')
-        query = {'scopes': ','.join(self.scopes)} if self.scopes else None
-        tx = await self.get(f'instance/service-accounts/{account}/token', query)
+        query: dict[str, str] = {'scopes': ','.join(self.scopes)} if self.scopes else {}
+        if (fingerprint := X509.agent_fingerprint()) is not None:
+            query['bindCertificateFingerprint'] = fingerprint
+        tx = await self.get(f'instance/service-accounts/{account}/token', query or None)
         data = Provider.parse_token(tx, 'the metadata server of Google Cloud')
         if self._details is None:
             self._details = {

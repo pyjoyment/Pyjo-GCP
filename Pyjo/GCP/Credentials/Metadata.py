@@ -240,7 +240,7 @@ class Pyjo_GCP_Credentials_Metadata(Provider.object):
             return None
         account = url_escape(self.service_account, r'^A-Za-z0-9\-._~@')
         query: dict[str, str] = {'scopes': ','.join(self.scopes)} if self.scopes else {}
-        if (fingerprint := X509.agent_fingerprint()) is not None:
+        if (fingerprint := await X509.agent_fingerprint_steps()) is not None:
             query['bindCertificateFingerprint'] = fingerprint
         tx = await self.get(f'instance/service-accounts/{account}/token', query or None)
         data = Provider.parse_token(tx, 'the metadata server of Google Cloud')

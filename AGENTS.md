@@ -403,10 +403,11 @@ it. A bound token is for the calls of mTLS with that certificate, which
 
 google-auth waits 30 seconds for the certificate of a configuration of
 `GOOGLE_API_CERTIFICATE_CONFIG` that is not there yet, as of an agent that
-starts before its certificate is written, and fails then; `agent_fingerprint`
-fails at once, as a function and not a coroutine of the steps, whose `Sleep`
-would wait without blocking the loop, and the provider gets the token again
-on the next call.
+starts before its certificate is written, and fails then, and so do the steps
+of `agent_fingerprint_steps` that the metadata server awaits, with `Sleep` of
+`Pyjo.Steps`, the intervals of `POLLING_INTERVALS` of google-auth, which a
+test shortens, so that `run_p` waits without blocking the loop.
+`agent_fingerprint`, a function and not steps, fails at once.
 
 `t/GCP_X509.py` checks the DER, the fingerprint and the URIs with the parser
 of the module `ssl` of Python, and the tests of the agents take a

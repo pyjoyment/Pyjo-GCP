@@ -21,8 +21,13 @@ It is for a program that needs a few calls of Google Cloud and no dependency
 for them, not a replacement of the client libraries of Google, which have every
 API.
 
-The distribution is at its beginning: the plan is in the
-[issues](https://github.com/pyjoyment/Pyjo-GCP/issues) of this repository.
+It finds the credentials that gcloud and the client libraries find: a user of
+`gcloud auth application-default login`, the key of a service account, an
+impersonated service account, Workload Identity Federation of a file, a URL, an
+executable, AWS or a certificate of X.509, a user of a workforce pool, and the
+metadata server of Compute Engine, GKE, Cloud Run and Cloud Functions. It calls
+the JSON APIs blocking and non-blocking, with their emulators, a universe
+domain and mTLS, and depends on Pyjoyment only.
 
 ## Installation
 

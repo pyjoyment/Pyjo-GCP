@@ -1,4 +1,4 @@
-[![Home](https://img.shields.io/badge/%F0%9F%8F%A0-Pyjoyment-02a7a0)](https://github.com/pyjoyment/Pyjoyment)
+[![Home](https://img.shields.io/badge/%F0%9F%8F%A0-Pyjoyment-02a7a0)](https://pyjoyment.dev/)
 [![GitHub](https://img.shields.io/github/stars/pyjoyment/Pyjo-GCP?style=flat&label=GitHub%20%E2%AD%90&logo=github)](https://github.com/pyjoyment/Pyjo-GCP)
 [![Documentation](https://img.shields.io/badge/docs-Read_the_Docs-blue?logo=readthedocs&logoColor=white)](https://pyjoyment.readthedocs.io/projects/pyjo-gcp/en/stable/)
 [![License](https://img.shields.io/github/license/pyjoyment/Pyjo-GCP.svg)](https://github.com/pyjoyment/Pyjo-GCP/blob/main/LICENSE)
@@ -15,7 +15,7 @@
   </picture>
 </p>
 
-Google Cloud for [Pyjoyment](https://github.com/pyjoyment/Pyjoyment): the
+Google Cloud for [Pyjoyment](https://pyjoyment.dev/): the
 requests of its user agent to the APIs of Google Cloud, with the Application
 Default Credentials that the client libraries of Google find, without an SDK.
 It is for a program that needs a few calls of Google Cloud and no dependency

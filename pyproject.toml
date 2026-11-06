@@ -29,7 +29,7 @@ classifiers = [
 cryptography = ["cryptography>=50.0.2"]
 
 [project.urls]
-Homepage = "https://github.com/pyjoyment/Pyjo-GCP"
+Homepage = "https://pyjoyment.dev/"
 Documentation = "https://pyjoyment.readthedocs.io/projects/pyjo-gcp/en/stable/"
 
 # Sphinx of docs/, which Read the Docs and the workflow Docs install with uv sync --group docs

@@ -65,6 +65,12 @@ def crm(c):
     c.render(json={'projectNumber': c.param('number'), 'projectId': 'myproject'})
 
 
+@get('/crm/v1/projects/<number>')
+def crm_emulator(c):
+    CALLS.append(('crm', c.param('number'), c.req.headers.header('Authorization')))
+    c.render(json={'projectNumber': c.param('number'), 'projectId': 'emulated'})
+
+
 @get('/subject')
 def subject(c):
     CALLS.append(('subject', c.req.headers.header('Metadata')))
@@ -238,6 +244,23 @@ with environ():
             re.compile(r"^Invalid credentials of an external account: no service account in '/iam/'"),
             'URL without a service account',
         )
+
+    with subtest('Emulators'):
+        base = ua.server.url().to_str().rstrip('/')
+        with environ(IAMCREDENTIALS_EMULATOR_HOST=f'{base}/iam', CLOUDRESOURCEMANAGER_EMULATOR_HOST=f'{base}/crm'):
+            CALLS.clear()
+            url = f'https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/{TARGET}:generateAccessToken'
+            provider = provider_of(info(service_account_impersonation_url=url))
+            provider.project_url = None
+            credentials = provider.credentials()
+            is_ok((credentials.token, credentials.project), ('ya29.impersonated', 'emulated'),
+                  'token and project of the emulators')  # fmt: skip
+            is_ok([call[0] for call in CALLS], ['sts', 'iam', 'crm'], 'exchange, impersonation and project')
+            is_ok((CALLS[1][2], CALLS[2][2]), (None, None), 'emulators without a token')
+
+            CALLS.clear()
+            is_ok(provider_of(info()).credentials().project, 'myproject', 'URL of the projects over the emulator')
+            is_ok(CALLS[-1], ('crm', '123', 'Bearer ya29.file-token'), 'URL of the projects with the token')
 
     with subtest('Errors'):
         throws_ok(

@@ -237,10 +237,23 @@ given to it, which adds their token and quota project, as `apply` of
 google-auth does, and whose `Pyjo.GCP.Error` the exception of the provider
 keeps the message of. The endpoint is
 `https://iamcredentials.<universe domain>` of the universe domain of the
-source, as google-auth has it, or an `endpoint` of the provider, or the `url`
-of `generateAccessToken` itself, `iam_endpoint_override` of google-auth, which
-an external account gives it. A test gives a relative one, as an empty
-endpoint of the client is the server of its user agent, not none.
+source, as google-auth has it, or the `url` of `generateAccessToken` itself,
+`iam_endpoint_override` of google-auth, which an external account gives it,
+or the emulator of `IAMCREDENTIALS_EMULATOR_HOST` over both, or an `endpoint`
+of the provider over all. A test gives a relative one, as an empty endpoint
+of the client is the server of its user agent, not none.
+
+google-auth knows no emulators, but the variables of `Pyjo.GCP.Config` tell
+that a program talks to its emulators and not to Google, which a check of
+the examples against a local mock found it did not (#43). The emulator comes
+in place of the URLs of Google only, not over an `endpoint` of the code, as
+in `Pyjo.GCP.Client`, and goes without a token, as the client calls an
+emulator. The provider does not pass `endpoint=None` to the client for the
+others, which would take the universe domain of the configuration, not the
+one of the source, and fail on credentials of another universe. The token
+endpoints of the source, of a key of a service account or of the STS, have
+no service of an emulator, and a test points them to its own application
+with `token_uri` and `token_url` of the file.
 
 A file of `impersonated_service_account` names the service account in
 `service_account_impersonation_url`, of which google-auth takes the service
@@ -368,8 +381,11 @@ The project is the one of `get_project_id`, which `_default.py` asks for an
 external account always: Cloud Resource Manager of the number of the project
 of the audience, or of the workforce pool user project, with the token of the
 provider, once, and none of a response that is not successful. Its URL is
-`project_url`, of `googleapis.com` in any universe, as google-auth has it,
-which a test points to its own application.
+`project_url`, or the emulator of `CLOUDRESOURCEMANAGER_EMULATOR_HOST`
+without a token, or `PROJECT_URL` of `googleapis.com` in any universe, as
+google-auth has it, which a test points to its own application. It is a
+request of the user agent, not a call of `Pyjo.GCP.Client`, which would take
+the universe domain of the configuration and add `x-goog-user-project`.
 
 `Pyjo.GCP.Credentials.ExternalAccountAuthorizedUser` is
 `external_account_authorized_user.py`: the refresh token of a user of a

@@ -53,7 +53,12 @@ The token of the source needs a scope of IAM, as
 :mod:`Pyjo.GCP.Credentials.Chain`, or
 ``https://www.googleapis.com/auth/iam``, of the key of a service account of
 a file. The endpoint of the API is the one of the universe domain of the
-source, as google-auth has it.
+source, as google-auth has it, or the emulator of
+``IAMCREDENTIALS_EMULATOR_HOST``, which the provider calls without a token,
+as :mod:`Pyjo.GCP.Client` calls an emulator, so that a program tested
+against emulators does not call Google. The token of the source comes of
+its own provider, as the token endpoint of a key of a service account, which
+no emulator replaces.
 
 With a :attr:`subject`, the token is the one of the domain-wide delegation of
 Google Workspace: the JWT of the grant of RFC 7523 that ``signJwt`` of the API
@@ -192,8 +197,9 @@ class Pyjo_GCP_Credentials_Impersonated(Provider.object):
             url = provider.endpoint
 
         The URL of the endpoint of the IAM Service Account Credentials API,
-        or ``None``, for ``https://iamcredentials.<universe domain>`` of the
-        universe domain of the source.
+        which comes over the emulator of ``IAMCREDENTIALS_EMULATOR_HOST`` and
+        :attr:`url`, or ``None``, for ``https://iamcredentials.<universe domain>``
+        of the universe domain of the source.
         """
 
         self.url = url
@@ -201,9 +207,10 @@ class Pyjo_GCP_Credentials_Impersonated(Provider.object):
 
             url = provider.url
 
-        The URL of ``generateAccessToken`` of the service account, which
-        comes over :attr:`endpoint`, as ``service_account_impersonation_url``
-        of the credentials of an external account has it, or ``None``.
+        The URL of ``generateAccessToken`` of the service account, as
+        ``service_account_impersonation_url`` of the credentials of an
+        external account has it, without an :attr:`endpoint` and an emulator
+        of ``IAMCREDENTIALS_EMULATOR_HOST``, or ``None``.
         """
 
         self.token_uri = token_uri
@@ -282,12 +289,17 @@ class Pyjo_GCP_Credentials_Impersonated(Provider.object):
     ) -> dict[str, Any]:
         if self.delegates:
             body['delegates'] = self.delegates
-        endpoint = self.endpoint if self.endpoint is not None else f'https://iamcredentials.{universe}'
         account = url_escape(self.target_principal, r'^A-Za-z0-9\-._~@')
         path = f'/v1/projects/-/serviceAccounts/{account}:{method}'
-        if method == 'generateAccessToken' and self.url is not None:
-            endpoint, path = _split(self.url)
-        client = Client.new(service='iamcredentials', endpoint=endpoint, credentials=self.source, ua=self.ua)
+        config, endpoint = Config.new(), self.endpoint
+        if endpoint is None and config.emulator_host('iamcredentials') is None:
+            if method == 'generateAccessToken' and self.url is not None:
+                endpoint, path = _split(self.url)
+            else:
+                endpoint = f'https://iamcredentials.{universe}'
+        client = Client.new(
+            service='iamcredentials', endpoint=endpoint, config=config, credentials=self.source, ua=self.ua
+        )
         call = Call.new('POST', path, body)
         try:
             data = await client.steps(call, source)

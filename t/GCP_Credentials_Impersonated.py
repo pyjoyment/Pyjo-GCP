@@ -149,6 +149,22 @@ with subtest('Token'):
     is_ok(Impersonated.new(source=source(), target_principal='other', url=url, ua=ua).credentials().token,
           f'ya29.{TARGET}', 'URL of generateAccessToken over the service account')  # fmt: skip
 
+with subtest('Emulator'):
+    with environ(IAMCREDENTIALS_EMULATOR_HOST=ua.server.url().to_str().rstrip('/') + '/iam'):
+        CALLS.clear()
+        is_ok(Impersonated.new(source=source(), target_principal=TARGET, ua=ua).credentials().token, f'ya29.{TARGET}',
+              'token of the emulator')  # fmt: skip
+        is_ok(CALLS[-1][:3], ('generateAccessToken', TARGET, None), 'emulator without a token')
+        url = f'https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/{TARGET}:generateAccessToken'
+        is_ok(Impersonated.new(source=source(), target_principal=TARGET, url=url, ua=ua).credentials().token,
+              f'ya29.{TARGET}', 'emulator over the URL')  # fmt: skip
+
+    with environ(IAMCREDENTIALS_EMULATOR_HOST='127.0.0.1:9'):
+        CALLS.clear()
+        provider = Impersonated.new(source=source(), target_principal=TARGET, endpoint='/iam', ua=ua)
+        is_ok(provider.credentials().token, f'ya29.{TARGET}', 'endpoint over the emulator')
+        is_ok(CALLS[-1][2], 'Bearer ya29.source', 'endpoint with the token of the source')
+
 with subtest('Domain-wide delegation'):
     CALLS.clear()
     provider = Impersonated.new(source=source(), target_principal=TARGET, subject='admin@example.com',

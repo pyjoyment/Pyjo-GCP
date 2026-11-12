@@ -35,7 +35,12 @@ scope of IAM, as google-auth has them.
 
 The project is the one of the number of the project of the audience, or of
 the workforce pool user project, of Cloud Resource Manager, which the
-provider asks once, with its token, as google-auth does.
+provider asks once, with its token, as google-auth does, or of its emulator
+of ``CLOUDRESOURCEMANAGER_EMULATOR_HOST`` without a token, as
+:mod:`Pyjo.GCP.Client` calls an emulator. The impersonation of
+``service_account_impersonation_url`` goes to the emulator of
+``IAMCREDENTIALS_EMULATOR_HOST`` of :mod:`Pyjo.GCP.Credentials.Impersonated`,
+but the exchange goes to ``token_url``, which no emulator replaces.
 
 See also
 --------
@@ -99,7 +104,7 @@ class Pyjo_GCP_Credentials_ExternalAccount(Provider.object):
         quota_project: str | None = None,
         workforce_pool_user_project: str | None = None,
         universe_domain: str | None = None,
-        project_url: str = PROJECT_URL,
+        project_url: str | None = None,
         **kwargs: Any,
     ) -> None:
         """::
@@ -221,7 +226,9 @@ class Pyjo_GCP_Credentials_ExternalAccount(Provider.object):
 
             url = provider.project_url
 
-        The URL of the projects of Cloud Resource Manager,
+        The URL of the projects of Cloud Resource Manager, which comes over
+        the emulator of ``CLOUDRESOURCEMANAGER_EMULATOR_HOST``, or ``None``,
+        for :data:`PROJECT_URL`,
         ``https://cloudresourcemanager.googleapis.com/v1/projects/``.
         """
 
@@ -427,8 +434,10 @@ class Pyjo_GCP_Credentials_ExternalAccount(Provider.object):
         number = self.project_number() or self.workforce_pool_user_project
         if not number:
             return None
-        url = self.project_url + url_escape(number)
-        tx = await self.start(self.ua.build_tx('GET', url, {'Authorization': f'Bearer {credentials.token}'}))
+        url, headers = self.project_url, {'Authorization': f'Bearer {credentials.token}'}
+        if url is None and (emulator := Config.new().emulator_host('cloudresourcemanager')) is not None:
+            url, headers = emulator.rstrip('/') + '/v1/projects/', {}
+        tx = await self.start(self.ua.build_tx('GET', (url or PROJECT_URL) + url_escape(number), headers))
         try:
             data: Any = tx.res.json() if tx.res.code == 200 else None
         except ValueError:

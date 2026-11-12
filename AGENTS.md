@@ -468,6 +468,18 @@ Storage is one segment of the path of the JSON API, with its slashes
 percent-encoded, which the router of Pyjoyment decodes, so the route of an
 object in a test is a wildcard, `<*name>`.
 
+The result of a request with `alt=media` is its body, whatever its
+`Content-Type`, as google-api-python-client has it: `MediaModel` of the
+methods `*_media` sets `alt=media` and gives the content as it is, so an
+object of JSON keeps its numbers, its keys and its whitespace, and one that
+is not valid JSON does not fail. `parse` reads `alt` of the URL of the
+request, not of the query of the call, which the path may have too. A method
+without `alt=media` whose body is not JSON, as `files.export` of Google
+Drive, which the client of Google knows of its discovery document, as
+`RawModel` of a method without a `response`, needs a subclass, and so does
+the media of the XML API of Cloud Storage. The error of a media download is
+JSON, which `error` reads before `parse`.
+
 ## The Examples
 
 `examples/` has the scripts that show what the distribution is for, a few

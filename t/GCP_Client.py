@@ -55,6 +55,8 @@ def list_objects(c):
 @get('/gcs/storage/v1/b/<bucket>/o/<*name>')
 def get_object(c):
     if c.param('alt') == 'media':
+        if c.param('name') == 'config.json':
+            return c.render(data=b'{"a": 1.10, "a": [1, 2]}', format='json')
         return c.render(data=b'Hello', format='txt')
     c.render(json={'name': c.param('name'), 'bucket': c.param('bucket')})
 
@@ -182,6 +184,11 @@ with subtest('Calls'):
     )
     is_ok(seen['path'], '/gcs/storage/v1/b/mybucket/o/docs%2Fb%20c.txt', 'path as it is')
     is_ok(storage.call(Call('GET', '/storage/v1/b/mybucket/o/a.txt', query={'alt': 'media'})), b'Hello', 'media')
+    config = b'{"a": 1.10, "a": [1, 2]}'
+    media = storage.call(Call('GET', '/storage/v1/b/mybucket/o/config.json', query={'alt': 'media'}))
+    is_ok(media, config, 'media of JSON as it is')
+    is_ok(storage.call(Call('GET', '/storage/v1/b/mybucket/o/config.json?alt=media')), config, 'media of the path')
+    is_ok(storage.call(Call('GET', '/storage/v1/b/mybucket/o/config.json'))['name'], 'config.json', 'JSON of no media')
 
     bucket = storage.call(Call('POST', '/storage/v1/b', {'name': 'new'}, query={'project': 'myproject'}))
     is_ok(bucket, {'name': 'new', 'project': 'myproject'}, 'JSON of the body')

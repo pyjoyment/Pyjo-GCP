@@ -27,17 +27,23 @@ protocol of the APIs of Google over HTTP and JSON: a method and a path,
 which is percent-encoded already, with the parameters of its query, its
 headers and the JSON of its body. The result is the JSON of the response,
 its body of another type, or ``None`` without a body, and the error is the
-:mod:`Pyjo.GCP.Error` of ``google.rpc.Status`` of the response.
+:mod:`Pyjo.GCP.Error` of ``google.rpc.Status`` of the response. The media
+of a request with ``alt=media``, as an object of Cloud Storage, is its body
+of any type, also of JSON, as ``MediaModel`` of the client of the discovery
+documents of Google has it: ::
+
+    data = storage.call(Call('GET', '/storage/v1/b/mybucket/o/config.json', query={'alt': 'media'}))
 
 Without the discovery documents of the APIs, which the client libraries of
 Google are generated from, a call takes the names and the structure of the
 API as its documentation has them, and gives the result as the response
-has it. A subclass changes the transaction and the result, as a call that
-streams the media of an object of Cloud Storage: ::
+has it. A subclass changes the transaction and the result, as a call of a
+method that gives its body without ``alt=media``, as ``files.export`` of
+Google Drive, or of the media of the XML API of Cloud Storage: ::
 
-    class GetMedia(Call):
-        def __init__(self, path):
-            super().__init__('GET', path, query={'alt': 'media'})
+    class Export(Call):
+        def __init__(self, file_id, mime_type):
+            super().__init__('GET', f'/drive/v3/files/{file_id}/export', query={'mimeType': mime_type})
 
         def parse(self, tx):
             return tx.res.body
@@ -178,12 +184,13 @@ class Pyjo_GCP_Call(Pyjo.Base.object):
             result = call.parse(tx)
 
         The JSON of a response with a successful status, its body of a type
-        that is not JSON, or ``None`` without a body.
+        that is not JSON or of a request with ``alt=media``, or ``None``
+        without a body.
         """
         res = tx.res
         if not res.body:
             return None
-        if 'json' in (res.headers.content_type or 'json'):
+        if tx.req.url.query.param('alt') != 'media' and 'json' in (res.headers.content_type or 'json'):
             return res.json()
         return res.body
 

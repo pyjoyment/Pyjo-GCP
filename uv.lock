@@ -524,7 +524,7 @@ docs = ">=3.14"
 [package.metadata]
 requires-dist = [
     { name = "cryptography", marker = "extra == 'cryptography'", specifier = ">=50.0.2" },
-    { name = "pyjoyment", git = "https://github.com/pyjoyment/Pyjoyment?branch=main" },
+    { name = "pyjoyment", specifier = ">=0.4.0" },
 ]
 provides-extras = ["cryptography"]
 
@@ -533,8 +533,12 @@ docs = [{ name = "sphinx", marker = "python_full_version >= '3.14'", specifier =
 
 [[package]]
 name = "pyjoyment"
-version = "0.4.1.dev1"
-source = { git = "https://github.com/pyjoyment/Pyjoyment?branch=main#a8080da7fd2e5877c26be153a0b1ca034d1c72ab" }
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2e/25/9e25b9eecd0be4cb4cc9b80e907082dc66a74136e67ce004aa2cba94955b/pyjoyment-0.4.0.tar.gz", hash = "sha256:e3cfb47dab0bdb1507e925eba478695609a56c110205be17c32e027a40457a29", size = 2162685, upload-time = "2026-11-17T20:02:03.649Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/64/fe/10aa5d95477022319b5226c641347ead49b20b9fd35b093932ceb0a78eb8/pyjoyment-0.4.0-py3-none-any.whl", hash = "sha256:451c819d888f920c56aa4ce39f1b17d83fb2bd79fb1f16a76f8878e77981237b", size = 1293412, upload-time = "2026-11-17T20:02:01.792Z" },
+]
 
 [[package]]
 name = "requests"

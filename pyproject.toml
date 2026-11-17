@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "Pyjo-GCP"
-version = "0.1.1"
+version = "0.1.2.dev1"
 description = "Google Cloud for Pyjoyment: Application Default Credentials and clients of the APIs, without an SDK."
 readme = "README.md"
 license = "Artistic-2.0"

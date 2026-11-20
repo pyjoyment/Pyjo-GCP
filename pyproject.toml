@@ -11,7 +11,7 @@ license = "Artistic-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Piotr Roszatycki", email = "piotr.roszatycki@gmail.com" }]
 requires-python = ">=3.12"
-dependencies = ["Pyjoyment>=0.4.0"]
+dependencies = ["Pyjoyment>=0.5.0"]
 keywords = [
   "pyjoyment",
   "gcp",
